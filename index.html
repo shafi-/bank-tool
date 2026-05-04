@@ -3,504 +3,684 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bank Statement Query Tool</title>
+<title>Bank.Query - Offline SQL for Bank Statements</title>
+<meta name="description" content="Query your bank statements with SQL. Fully offline.">
+<meta name="theme-color" content="#1a1714">
+<link rel="manifest" href="standalone/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="standalone/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="standalone/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BankQuery">
 <script src="alasql.min.js"></script>
 <style>
-  /* ── Design: Industrial terminal meets financial ledger ── */
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-  :root {
-    --bg:        #0d0f11;
-    --surface:   #13171b;
-    --surface2:  #1a1f25;
-    --border:    #252c35;
-    --border2:   #2e3740;
-    --green:     #00e5a0;
-    --green-dim: #00e5a022;
-    --red:       #ff4d6a;
-    --red-dim:   #ff4d6a18;
-    --amber:     #f5a623;
-    --blue:      #4da6ff;
-    --text:      #c8d6e5;
-    --text-dim:  #5a6a7a;
-    --text-mid:  #8a9ab0;
-    --mono:      'IBM Plex Mono', monospace;
-    --sans:      'IBM Plex Sans', sans-serif;
-    --radius:    4px;
-  }
+:root {
+  --bg:       #f5f2ed;
+  --paper:    #faf8f5;
+  --ink:      #1a1714;
+  --ink2:     #4a4540;
+  --ink3:     #8a8078;
+  --rule:     #e0d8ce;
+  --rule2:    #ccc4ba;
+  --accent:   #c8402a;
+  --accent2:  #2a6fc8;
+  --green:    #2a7a4a;
+  --red:      #c8402a;
+  --amber:    #b86a10;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Syne', sans-serif;
+  --r:        3px;
+}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 14px;
-    line-height: 1.5;
-    min-height: 100vh;
-  }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
 
-  /* ── Header ── */
-  header {
-    border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-  }
-  .logo {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--green);
-    letter-spacing: 0.08em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .logo::before {
-    content: '▶';
-    font-size: 10px;
-  }
-  .header-meta {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-  #status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-family: var(--mono);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    transition: all 0.3s;
-  }
-  #status-badge.loaded {
-    background: var(--green-dim);
-    border-color: var(--green);
-    color: var(--green);
-  }
-  #status-badge .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-  }
+/* ─── HEADER ─── */
+header {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.logo span { color: var(--accent); }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: #aaa;
+  font-family: var(--mono);
+}
+.btn-install {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-install:hover {
+  background: var(--accent2);
+  transform: scale(1.05);
+}
+.btn-install.show {
+  display: inline-flex;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #2a2520;
+  border: 1px solid #3a3530;
+  border-radius: 20px;
+  font-size: 11px;
+  transition: all 0.3s;
+}
+.badge.ok { background: #1a2a1f; border-color: #2a7a4a; color: #4adf8a; }
+.badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 
-  /* ── Layout ── */
-  .main {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    grid-template-rows: auto 1fr;
-    height: calc(100vh - 52px);
-    overflow: hidden;
-  }
+/* ─── LAYOUT ─── */
+.app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+}
 
-  /* ── Sidebar ── */
-  .sidebar {
-    grid-row: 1 / -1;
-    border-right: 1px solid var(--border);
-    background: var(--surface);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-  .sidebar-section {
-    border-bottom: 1px solid var(--border);
-    padding: 16px;
-  }
-  .sidebar-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
+/* ─── SIDEBAR ─── */
+.sidebar {
+  grid-row: 1 / -1;
+  background: var(--paper);
+  border-right: 1px solid var(--rule);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-block {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.block-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 12px;
+}
 
-  /* Load zone */
-  .drop-zone {
-    border: 1px dashed var(--border2);
-    border-radius: var(--radius);
-    padding: 20px 12px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: var(--text-mid);
-    font-size: 12px;
-    line-height: 1.6;
-  }
-  .drop-zone:hover, .drop-zone.drag-over {
-    border-color: var(--green);
-    background: var(--green-dim);
-    color: var(--green);
-  }
-  .drop-zone .icon { font-size: 20px; margin-bottom: 6px; display: block; }
-  #file-input { display: none; }
+/* Upload zone */
+.upload-zone {
+  border: 1.5px dashed var(--rule2);
+  border-radius: var(--r);
+  padding: 20px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--ink3);
+  font-size: 12px;
+  line-height: 1.7;
+  user-select: none;
+}
+.upload-zone:hover, .upload-zone.over {
+  border-color: var(--accent2);
+  background: #e8f0ff;
+  color: var(--accent2);
+}
+.upload-zone .icon { font-size: 22px; display: block; margin-bottom: 6px; }
+#file-in { display: none; }
 
-  /* Stats cards */
-  .stat-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-  .stat-card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 8px 10px;
-  }
-  .stat-card .s-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }
-  .stat-card .s-value {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-  }
-  .stat-card.green .s-value { color: var(--green); }
-  .stat-card.red .s-value { color: var(--red); }
-  .stat-card.amber .s-value { color: var(--amber); }
-  .stat-card.blue .s-value { color: var(--blue); }
+/* Password field */
+.field-row { display: flex; gap: 6px; }
+.pw-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.pw-input:focus { border-color: var(--accent2); }
+.pw-input::placeholder { color: var(--ink3); }
 
-  /* Saved queries */
-  .query-list { display: flex; flex-direction: column; gap: 4px; }
-  .query-item {
-    padding: 7px 10px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    font-size: 12px;
-    color: var(--text-mid);
-    transition: all 0.15s;
-    font-family: var(--mono);
-    line-height: 1.3;
-    word-break: break-word;
-  }
-  .query-item:hover {
-    border-color: var(--blue);
-    background: #4da6ff11;
-    color: var(--blue);
-  }
-  .query-item .q-label {
-    font-size: 10px;
-    color: var(--text-dim);
-    font-family: var(--sans);
-    margin-bottom: 2px;
-  }
+/* Buttons */
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r);
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.btn-primary:hover { background: #333; }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  border-color: var(--rule2);
+  color: var(--ink2);
+}
+.btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-export {
+  background: transparent;
+  border-color: var(--rule2);
+  color: var(--ink2);
+}
+.btn-export:hover { border-color: var(--amber); color: var(--amber); }
 
-  /* ── Top: SQL editor ── */
-  .editor-pane {
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .editor-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .editor-title {
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-  }
-  .editor-actions { display: flex; gap: 8px; align-items: center; }
+/* Progress */
+#progress-section { display: none; }
+.progress-bar-wrap {
+  background: var(--rule);
+  border-radius: 3px;
+  height: 4px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--accent2);
+  border-radius: 3px;
+  transition: width 0.2s;
+  width: 0%;
+}
+.progress-log {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink3);
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
 
-  textarea#sql-editor {
-    width: 100%;
-    height: 90px;
-    background: var(--bg);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    color: var(--green);
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.6;
-    padding: 10px 14px;
-    resize: vertical;
-    outline: none;
-    transition: border-color 0.2s;
-    tab-size: 2;
-  }
-  textarea#sql-editor:focus { border-color: var(--green); }
-  textarea#sql-editor::placeholder { color: var(--text-dim); }
+/* Stats */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat-card {
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 8px 10px;
+}
+.stat-card .s-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 2px;
+}
+.stat-card .s-val {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+.s-val.c-green { color: var(--green); }
+.s-val.c-red   { color: var(--red); }
+.s-val.c-amber { color: var(--amber); }
+.s-val.c-blue  { color: var(--accent2); }
 
-  /* ── Buttons ── */
-  .btn {
-    height: 32px;
-    padding: 0 16px;
-    border-radius: var(--radius);
-    border: 1px solid;
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .btn-run {
-    background: var(--green);
-    border-color: var(--green);
-    color: #000;
-  }
-  .btn-run:hover { filter: brightness(1.1); }
-  .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-ghost {
-    background: transparent;
-    border-color: var(--border2);
-    color: var(--text-mid);
-  }
-  .btn-ghost:hover { border-color: var(--blue); color: var(--blue); }
-  .btn-export {
-    background: transparent;
-    border-color: var(--border2);
-    color: var(--text-mid);
-  }
-  .btn-export:hover { border-color: var(--amber); color: var(--amber); }
+/* Schema */
+.schema-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  margin-bottom: 3px;
+}
+.schema-row .fname { color: var(--accent2); }
+.schema-row .ftype { color: var(--ink3); font-size: 10px; }
 
-  .kbd {
-    font-family: var(--mono);
-    font-size: 10px;
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 3px;
-    padding: 1px 5px;
-    color: var(--text-dim);
-  }
+/* Example queries */
+.eq-list { display: flex; flex-direction: column; gap: 4px; }
+.eq-item {
+  padding: 7px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink2);
+  font-family: var(--mono);
+  line-height: 1.3;
+  transition: all 0.15s;
+  word-break: break-word;
+  position: relative;
+}
+.eq-item:hover { border-color: var(--accent2); color: var(--accent2); background: #e8f0ff; }
+.eq-item .eq-label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.eq-item.saved {
+  border-color: var(--accent);
+  background: #fff5f3;
+}
+.eq-item.saved:hover {
+  border-color: var(--accent2);
+  background: #e8f0ff;
+}
+.eq-item .eq-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--red);
+  cursor: pointer;
+}
+.eq-item:hover .eq-delete { display: flex; }
+.eq-item .eq-delete:hover {
+  background: var(--red);
+  color: white;
+}
+.save-prompt {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.save-prompt-inner {
+  background: var(--paper);
+  border-radius: var(--r);
+  padding: 20px;
+  width: 300px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+.save-prompt-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--ink);
+}
+.save-prompt-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+  font-family: var(--mono);
+  font-size: 13px;
+  margin-bottom: 12px;
+  outline: none;
+}
+.save-prompt-input:focus { border-color: var(--accent2); }
+.save-prompt-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 
-  /* ── Results pane ── */
-  .results-pane {
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg);
-  }
-  .results-header {
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-  .results-meta {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-dim);
-    display: flex;
-    gap: 16px;
-    align-items: center;
-  }
-  .results-meta .highlight { color: var(--text); }
-  .results-meta .err { color: var(--red); }
+/* Expanded editor modal */
+.expand-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.expand-modal-inner {
+  background: var(--paper);
+  border-radius: var(--r);
+  width: 90%;
+  max-width: 900px;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.expand-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.expand-modal-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.expand-modal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.expand-modal-body {
+  flex: 1;
+  padding: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.expand-modal-body textarea {
+  flex: 1;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+  tab-size: 2;
+}
+.expand-modal-body textarea:focus { border-color: var(--accent2); }
 
-  /* Error box */
-  .error-box {
-    margin: 16px 20px;
-    padding: 12px 16px;
-    background: var(--red-dim);
-    border: 1px solid var(--red);
-    border-radius: var(--radius);
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--red);
-    display: none;
-  }
+/* ─── EDITOR ─── */
+.editor-pane {
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  padding: 16px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.editor-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.editor-actions { display: flex; gap: 6px; align-items: center; }
+.kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--ink3);
+}
 
-  /* Table */
-  .table-wrap {
-    overflow: auto;
-    flex: 1;
-    padding: 0 0 16px;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--surface);
-  }
-  th {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    padding: 10px 16px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-    cursor: pointer;
-    user-select: none;
-    transition: color 0.15s;
-  }
-  th:hover { color: var(--blue); }
-  th .sort-icon { font-size: 9px; margin-left: 4px; opacity: 0.5; }
-  th.sorted { color: var(--blue); }
-  th.sorted .sort-icon { opacity: 1; }
-  td {
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text-mid);
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  tr:hover td { background: var(--surface2); color: var(--text); }
-  .cell-debit { color: var(--red) !important; }
-  .cell-credit { color: var(--green) !important; }
-  .cell-date { color: var(--text-mid); }
-  .cell-desc { color: var(--text) !important; max-width: 260px; }
-  .cell-balance { color: var(--amber) !important; }
-  .cell-num { text-align: right; }
+textarea#sql {
+  width: 100%;
+  height: 90px;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  tab-size: 2;
+}
+textarea#sql:focus { border-color: var(--accent2); }
+textarea#sql::placeholder { color: var(--ink3); }
 
-  /* Empty / loading states */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    gap: 12px;
-    color: var(--text-dim);
-    font-family: var(--mono);
-    font-size: 13px;
-    text-align: center;
-    padding: 40px;
-  }
-  .empty-state .big { font-size: 32px; }
-  .empty-state .hint { font-size: 11px; color: var(--border2); line-height: 1.7; }
+/* ─── RESULTS ─── */
+.results-pane {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.results-bar {
+  padding: 10px 22px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.results-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink3);
+  display: flex;
+  gap: 16px;
+}
+.results-meta .hi  { color: var(--ink); font-weight: 500; }
+.results-meta .err { color: var(--red); }
 
-  /* Schema pill */
-  .schema-list { display: flex; flex-direction: column; gap: 3px; }
-  .schema-field {
-    display: flex;
-    justify-content: space-between;
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 3px 6px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-  }
-  .schema-field .fname { color: var(--blue); }
-  .schema-field .ftype { color: var(--text-dim); font-size: 10px; }
+.error-msg {
+  margin: 14px 22px;
+  padding: 10px 14px;
+  background: #fff0ee;
+  border: 1px solid var(--red);
+  border-radius: var(--r);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--red);
+  display: none;
+}
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+.table-wrap {
+  overflow: auto;
+  flex: 1;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--paper);
+}
+th {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+th:hover { color: var(--accent2); }
+th.sorted { color: var(--accent2); }
+td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink2);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+tr:hover td { background: var(--paper); }
+.c-debit  { color: var(--red) !important; }
+.c-credit { color: var(--green) !important; }
+.c-bal    { color: var(--amber) !important; }
+.c-desc   { color: var(--ink) !important; max-width: 280px; }
+.c-right  { text-align: right; }
+.c-dim    { color: var(--ink3) !important; }
 
-  /* Tooltip */
-  [title] { cursor: help; }
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  color: var(--ink3);
+  text-align: center;
+  padding: 40px;
+}
+.empty-state .big { font-size: 36px; }
+.empty-state .title { font-weight: 700; font-size: 16px; color: var(--ink2); }
+.empty-state .hint { font-family: var(--mono); font-size: 12px; line-height: 1.8; color: var(--rule2); }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule2); border-radius: 3px; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">BANK_STATEMENT_QUERY</div>
-  <div style="display:flex;align-items:center;gap:12px;">
-    <span id="status-badge"><span class="dot"></span><span id="status-text">No data loaded</span></span>
-    <span class="header-meta">Offline · All data stays local</span>
+  <div class="logo">Bank<span>.</span>Query</div>
+  <div class="header-right">
+    <button id="btn-install" class="btn-install">⬇ Install App</button>
+    <span id="badge" class="badge"><span class="dot"></span><span id="badge-text">No data loaded</span></span>
+    <span>Fully offline · Nothing leaves your browser</span>
   </div>
 </header>
 
-<div class="main">
+<div class="app">
 
-  <!-- ── Sidebar ── -->
+  <!-- SIDEBAR -->
   <aside class="sidebar">
 
-    <!-- Load file -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Load Data</div>
-      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <!-- Upload -->
+    <div class="sidebar-block">
+      <div class="block-label">Load PDFs</div>
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-in').click()">
         <span class="icon">📂</span>
-        Click to load <strong>data.json</strong><br>
-        <small>or drag &amp; drop</small>
+        Click or drag &amp; drop<br>
+        <strong>multiple PDF files</strong>
       </div>
-      <input type="file" id="file-input" accept=".json">
+      <input type="file" id="file-in" accept=".pdf,.PDF" multiple>
     </div>
 
-    <!-- Summary stats -->
-    <div class="sidebar-section" id="stats-section" style="display:none">
-      <div class="sidebar-label">Summary</div>
+    <!-- Password -->
+    <div class="sidebar-block">
+      <div class="block-label">Password</div>
+      <div class="field-row">
+        <input type="password" id="pw" class="pw-input" placeholder="Shared PDF password">
+        <button class="btn btn-primary" id="btn-parse" onclick="startParsing()" disabled>Parse</button>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="sidebar-block" id="progress-section">
+      <div class="block-label">Processing</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-log" id="progress-log"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="sidebar-block" id="stats-section" style="display:none">
+      <div class="block-label">Summary</div>
       <div class="stat-grid">
-        <div class="stat-card blue">
-          <div class="s-label">Transactions</div>
-          <div class="s-value" id="stat-count">—</div>
-        </div>
-        <div class="stat-card amber">
-          <div class="s-label">Files</div>
-          <div class="s-value" id="stat-files">—</div>
-        </div>
-        <div class="stat-card red">
-          <div class="s-label">Total Debit</div>
-          <div class="s-value" id="stat-debit">—</div>
-        </div>
-        <div class="stat-card green">
-          <div class="s-label">Total Credit</div>
-          <div class="s-value" id="stat-credit">—</div>
-        </div>
+        <div class="stat-card"><div class="s-label">Transactions</div><div class="s-val c-blue" id="s-count">—</div></div>
+        <div class="stat-card"><div class="s-label">Files</div><div class="s-val c-blue" id="s-files">—</div></div>
+        <div class="stat-card"><div class="s-label">Total Debit</div><div class="s-val c-red" id="s-debit">—</div></div>
+        <div class="stat-card"><div class="s-label">Total Credit</div><div class="s-val c-green" id="s-credit">—</div></div>
       </div>
     </div>
 
     <!-- Schema -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Schema · transactions</div>
-      <div class="schema-list">
-        <div class="schema-field"><span class="fname">date</span><span class="ftype">TEXT</span></div>
-        <div class="schema-field"><span class="fname">description</span><span class="ftype">TEXT</span></div>
-        <div class="schema-field"><span class="fname">debit</span><span class="ftype">FLOAT</span></div>
-        <div class="schema-field"><span class="fname">credit</span><span class="ftype">FLOAT</span></div>
-        <div class="schema-field"><span class="fname">balance</span><span class="ftype">FLOAT</span></div>
-        <div class="schema-field"><span class="fname">file</span><span class="ftype">TEXT</span></div>
-        <div class="schema-field"><span class="fname">account</span><span class="ftype">TEXT</span></div>
-        <div class="schema-field"><span class="fname">page</span><span class="ftype">INT</span></div>
-        <div class="schema-field"><span class="fname">raw_line</span><span class="ftype">TEXT</span></div>
-      </div>
+    <div class="sidebar-block">
+      <div class="block-label">Schema · transactions</div>
+      <div class="schema-row"><span class="fname">date</span><span class="ftype">TEXT</span></div>
+      <div class="schema-row"><span class="fname">description</span><span class="ftype">TEXT</span></div>
+      <div class="schema-row"><span class="fname">reference</span><span class="ftype">TEXT</span></div>
+      <div class="schema-row"><span class="fname">debit</span><span class="ftype">FLOAT</span></div>
+      <div class="schema-row"><span class="fname">credit</span><span class="ftype">FLOAT</span></div>
+      <div class="schema-row"><span class="fname">balance</span><span class="ftype">FLOAT</span></div>
+      <div class="schema-row"><span class="fname">file</span><span class="ftype">TEXT</span></div>
+      <div class="schema-row"><span class="fname">account</span><span class="ftype">TEXT</span></div>
+      <div class="schema-row"><span class="fname">raw_line</span><span class="ftype">TEXT</span></div>
     </div>
 
     <!-- Saved queries -->
-    <div class="sidebar-section" style="flex:1;">
-      <div class="sidebar-label">Example Queries</div>
-      <div class="query-list" id="query-list"></div>
+    <div class="sidebar-block" id="saved-section" style="display:none">
+      <div class="block-label">Saved Queries</div>
+      <div class="eq-list" id="saved-list"></div>
+    </div>
+
+    <!-- Example queries -->
+    <div class="sidebar-block" style="flex:1">
+      <div class="block-label">Example Queries</div>
+      <div class="eq-list" id="eq-list"></div>
     </div>
 
   </aside>
 
-  <!-- ── Right side ── -->
+  <!-- RIGHT SIDE -->
   <div style="display:flex;flex-direction:column;overflow:hidden;">
 
     <!-- SQL Editor -->
@@ -509,32 +689,30 @@
         <span class="editor-title">SQL Query</span>
         <div class="editor-actions">
           <span class="kbd">Ctrl+Enter</span>
-          <button class="btn btn-ghost" onclick="clearEditor()">Clear</button>
-          <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ Export CSV</button>
-          <button class="btn btn-run" id="btn-run" onclick="runQuery()" disabled>▶ Run</button>
+          <button class="btn btn-ghost" onclick="clearSQL()">Clear</button>
+          <button class="btn btn-ghost" id="btn-save" onclick="showSavePrompt()" disabled>⭐ Save</button>
+          <button class="btn btn-ghost" onclick="showExpandModal()" title="Expand editor">⤢</button>
+          <button class="btn btn-primary" id="btn-run" onclick="runQuery()" disabled>▶ Run</button>
         </div>
       </div>
-      <textarea id="sql-editor" placeholder="SELECT * FROM transactions LIMIT 20" spellcheck="false"></textarea>
+      <textarea id="sql" placeholder="SELECT * FROM transactions LIMIT 20" spellcheck="false"></textarea>
     </div>
 
     <!-- Results -->
     <div class="results-pane">
-      <div class="results-header">
-        <div class="results-meta">
-          <span>RESULTS</span>
-          <span id="result-count"></span>
-          <span id="exec-time"></span>
+      <div class="results-bar">
+        <div class="results-meta" id="results-meta"><span>RESULTS</span></div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ CSV</button>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)" id="exec-time"></span>
         </div>
       </div>
-      <div class="error-box" id="error-box"></div>
+      <div class="error-msg" id="error-msg"></div>
       <div class="table-wrap" id="table-wrap">
-        <div class="empty-state" id="empty-state">
+        <div class="empty-state">
           <div class="big">📊</div>
-          <div>Load your <strong>data.json</strong> to begin</div>
-          <div class="hint">
-            Run parse.py first:<br>
-            <code>python parse.py ./statements mypassword</code>
-          </div>
+          <div class="title">No data yet</div>
+          <div class="hint">Upload your bank statement PDFs,<br>enter the password, then click Parse.</div>
         </div>
       </div>
     </div>
@@ -542,269 +720,67 @@
   </div>
 </div>
 
+<!-- Save query prompt -->
+<div class="save-prompt" id="save-prompt">
+  <div class="save-prompt-inner">
+    <div class="save-prompt-title">Save Query</div>
+    <input type="text" class="save-prompt-input" id="save-name" placeholder="Enter a name for this query..." autofocus>
+    <div class="save-prompt-actions">
+      <button class="btn btn-ghost" onclick="hideSavePrompt()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuery()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Expanded editor modal -->
+<div class="expand-modal" id="expand-modal">
+  <div class="expand-modal-inner">
+    <div class="expand-modal-header">
+      <span class="expand-modal-title">SQL Query Editor</span>
+      <div class="expand-modal-actions">
+        <span class="kbd">Ctrl+Enter</span>
+        <button class="btn btn-ghost" onclick="closeExpandModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="runFromExpanded()">▶ Run</button>
+      </div>
+    </div>
+    <div class="expand-modal-body">
+      <textarea id="sql-expanded" placeholder="SELECT * FROM transactions LIMIT 20" spellcheck="false"></textarea>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
 <script>
-// ── State ──
-let allData = [];
-let lastResults = [];
-let sortCol = null;
-let sortDir = 1;
+// PWA Install Prompt
+let deferredPrompt;
+const btnInstall = document.getElementById('btn-install');
 
-// ── Example queries ──
-const EXAMPLE_QUERIES = [
-  { label: "All transactions", sql: "SELECT date, description, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50" },
-  { label: "Monthly spending", sql: "SELECT SUBSTRING(date, 1, 7) AS month,\n  ROUND(SUM(debit), 2) AS total_debit,\n  ROUND(SUM(credit), 2) AS total_credit,\n  COUNT(*) AS tx_count\nFROM transactions\nGROUP BY SUBSTRING(date, 1, 7)\nORDER BY month DESC" },
-  { label: "Biggest debits", sql: "SELECT date, description, debit, file\nFROM transactions\nWHERE debit IS NOT NULL\nORDER BY debit DESC\nLIMIT 20" },
-  { label: "Search merchant", sql: "SELECT date, description, debit, credit\nFROM transactions\nWHERE UPPER(description) LIKE '%AMAZON%'\nORDER BY date DESC" },
-  { label: "Credits only", sql: "SELECT date, description, credit\nFROM transactions\nWHERE credit IS NOT NULL AND credit > 0\nORDER BY credit DESC" },
-  { label: "Per-file summary", sql: "SELECT file,\n  COUNT(*) AS transactions,\n  ROUND(SUM(debit), 2) AS total_out,\n  ROUND(SUM(credit), 2) AS total_in\nFROM transactions\nGROUP BY file\nORDER BY file" },
-  { label: "Date range filter", sql: "SELECT date, description, debit, credit\nFROM transactions\nWHERE date >= '2024-01-01'\n  AND date <= '2024-03-31'\nORDER BY date" },
-  { label: "Recurring amounts", sql: "SELECT debit, COUNT(*) AS occurrences,\n  MIN(description) AS sample_desc\nFROM transactions\nWHERE debit IS NOT NULL\nGROUP BY debit\nHAVING COUNT(*) > 2\nORDER BY occurrences DESC" },
-  { label: "Daily totals", sql: "SELECT date,\n  ROUND(SUM(debit), 2) AS spent,\n  ROUND(SUM(credit), 2) AS received\nFROM transactions\nGROUP BY date\nORDER BY date DESC\nLIMIT 30" },
-  { label: "All columns (raw)", sql: "SELECT * FROM transactions LIMIT 10" },
-];
-
-// Populate sidebar
-const ql = document.getElementById('query-list');
-EXAMPLE_QUERIES.forEach(q => {
-  const el = document.createElement('div');
-  el.className = 'query-item';
-  el.innerHTML = `<div class="q-label">${q.label}</div>${q.sql.split('\n')[0]}…`;
-  el.onclick = () => {
-    document.getElementById('sql-editor').value = q.sql;
-  };
-  ql.appendChild(el);
-});
-
-// ── File loading ──
-document.getElementById('file-input').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (file) loadFile(file);
-});
-
-const dropZone = document.getElementById('drop-zone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
+window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) loadFile(file);
+  deferredPrompt = e;
+  btnInstall.classList.add('show');
 });
 
-function loadFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data)) throw new Error("JSON must be an array of transactions");
-      initData(data, file.name);
-    } catch (err) {
-      showError("Failed to parse JSON: " + err.message);
-    }
-  };
-  reader.readAsText(file);
-}
-
-function initData(data, filename) {
-  allData = data;
-
-  // Register table in AlaSQL
-  alasql('DROP TABLE IF EXISTS transactions');
-  alasql('CREATE TABLE transactions');
-  alasql.tables.transactions.data = allData;
-
-  // Update status
-  const badge = document.getElementById('status-badge');
-  badge.className = 'loaded';
-  document.getElementById('status-text').textContent = `${data.length.toLocaleString()} rows · ${filename}`;
-
-  // Stats
-  const totalDebit  = data.reduce((s, r) => s + (r.debit || 0), 0);
-  const totalCredit = data.reduce((s, r) => s + (r.credit || 0), 0);
-  const files       = new Set(data.map(r => r.file)).size;
-
-  document.getElementById('stat-count').textContent  = data.length.toLocaleString();
-  document.getElementById('stat-files').textContent  = files;
-  document.getElementById('stat-debit').textContent  = fmtMoney(totalDebit);
-  document.getElementById('stat-credit').textContent = fmtMoney(totalCredit);
-  document.getElementById('stats-section').style.display = '';
-
-  // Enable buttons
-  document.getElementById('btn-run').disabled    = false;
-  document.getElementById('btn-export').disabled = true; // enable after first run
-
-  // Auto-run a default query
-  const editor = document.getElementById('sql-editor');
-  if (!editor.value.trim()) {
-    editor.value = "SELECT date, description, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50";
-  }
-  runQuery();
-}
-
-// ── Query execution ──
-document.getElementById('sql-editor').addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    e.preventDefault();
-    runQuery();
-  }
-  // Tab → 2 spaces
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const ta = e.target;
-    const s = ta.selectionStart, end = ta.selectionEnd;
-    ta.value = ta.value.substring(0, s) + '  ' + ta.value.substring(end);
-    ta.selectionStart = ta.selectionEnd = s + 2;
-  }
+btnInstall.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  btnInstall.classList.remove('show');
 });
 
-function runQuery() {
-  const sql = document.getElementById('sql-editor').value.trim();
-  if (!sql) return;
-  hideError();
+window.addEventListener('appinstalled', () => {
+  btnInstall.classList.remove('show');
+  deferredPrompt = null;
+});
 
-  const t0 = performance.now();
-  try {
-    const results = alasql(sql);
-    const elapsed = (performance.now() - t0).toFixed(1);
-
-    if (!Array.isArray(results)) {
-      // Non-SELECT statement
-      document.getElementById('result-count').innerHTML =
-        `<span class="highlight">Query executed (non-SELECT)</span>`;
-      renderTable([]);
-      return;
-    }
-
-    lastResults = results;
-    document.getElementById('result-count').innerHTML =
-      `<span class="highlight">${results.length.toLocaleString()}</span> row${results.length !== 1 ? 's' : ''}`;
-    document.getElementById('exec-time').textContent = `${elapsed}ms`;
-    document.getElementById('btn-export').disabled = results.length === 0;
-
-    renderTable(results);
-  } catch (err) {
-    showError(err.message);
-  }
-}
-
-function clearEditor() {
-  document.getElementById('sql-editor').value = '';
-  document.getElementById('sql-editor').focus();
-}
-
-// ── Table rendering ──
-const DEBIT_COLS  = new Set(['debit']);
-const CREDIT_COLS = new Set(['credit']);
-const DATE_COLS   = new Set(['date']);
-const DESC_COLS   = new Set(['description', 'desc']);
-const BAL_COLS    = new Set(['balance']);
-const NUM_COLS    = new Set(['debit','credit','balance','page']);
-
-function cellClass(col) {
-  if (DEBIT_COLS.has(col))  return 'cell-debit cell-num';
-  if (CREDIT_COLS.has(col)) return 'cell-credit cell-num';
-  if (DATE_COLS.has(col))   return 'cell-date';
-  if (DESC_COLS.has(col))   return 'cell-desc';
-  if (BAL_COLS.has(col))    return 'cell-balance cell-num';
-  if (NUM_COLS.has(col))    return 'cell-num';
-  return '';
-}
-
-function fmtCell(col, val) {
-  if (val === null || val === undefined) return '<span style="color:var(--border2)">—</span>';
-  if ((DEBIT_COLS.has(col) || CREDIT_COLS.has(col) || BAL_COLS.has(col)) && typeof val === 'number') {
-    return fmtMoney(val);
-  }
-  return String(val);
-}
-
-function fmtMoney(n) {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function renderTable(rows) {
-  const wrap = document.getElementById('table-wrap');
-
-  if (!rows || rows.length === 0) {
-    wrap.innerHTML = '<div class="empty-state"><div class="big">∅</div><div>No results</div></div>';
-    return;
-  }
-
-  const cols = Object.keys(rows[0]);
-  sortCol = null; sortDir = 1;
-
-  let html = '<table><thead><tr>';
-  cols.forEach(c => {
-    html += `<th onclick="sortBy('${c}')" data-col="${c}">${c} <span class="sort-icon">⇅</span></th>`;
+// Service Worker (for PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('standalone/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
   });
-  html += '</tr></thead><tbody>';
-
-  rows.forEach(row => {
-    html += '<tr>';
-    cols.forEach(c => {
-      const cls = cellClass(c);
-      html += `<td class="${cls}" title="${String(row[c] ?? '').replace(/"/g,'&quot;')}">${fmtCell(c, row[c])}</td>`;
-    });
-    html += '</tr>';
-  });
-
-  html += '</tbody></table>';
-  wrap.innerHTML = html;
-}
-
-function sortBy(col) {
-  if (sortCol === col) { sortDir *= -1; }
-  else { sortCol = col; sortDir = 1; }
-
-  const sorted = [...lastResults].sort((a, b) => {
-    const av = a[col], bv = b[col];
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1;
-    if (bv == null) return -1;
-    if (typeof av === 'number' && typeof bv === 'number') return sortDir * (av - bv);
-    return sortDir * String(av).localeCompare(String(bv));
-  });
-
-  renderTable(sorted);
-
-  // Highlight sorted column
-  document.querySelectorAll('th').forEach(th => {
-    th.classList.toggle('sorted', th.dataset.col === col);
-    const icon = th.querySelector('.sort-icon');
-    if (icon) icon.textContent = th.dataset.col === col ? (sortDir > 0 ? '↑' : '↓') : '⇅';
-  });
-}
-
-// ── Export CSV ──
-function exportCSV() {
-  if (!lastResults.length) return;
-  const cols = Object.keys(lastResults[0]);
-  const rows = [cols.join(',')];
-  lastResults.forEach(row => {
-    rows.push(cols.map(c => {
-      const v = row[c] ?? '';
-      return String(v).includes(',') ? `"${String(v).replace(/"/g, '""')}"` : v;
-    }).join(','));
-  });
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `query_results_${Date.now()}.csv`;
-  a.click();
-}
-
-// ── Error display ──
-function showError(msg) {
-  const box = document.getElementById('error-box');
-  box.textContent = '✗ ' + msg;
-  box.style.display = 'block';
-  document.getElementById('result-count').innerHTML = '<span class="err">Error</span>';
-  document.getElementById('table-wrap').innerHTML =
-    '<div class="empty-state"><div class="big">⚠</div><div>Query failed</div></div>';
-}
-
-function hideError() {
-  document.getElementById('error-box').style.display = 'none';
 }
 </script>
 </body>
