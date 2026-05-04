@@ -28,15 +28,12 @@ standalone/
 ├── alasql.min.js           # SQL query engine
 ├── pdf.min.mjs             # PDF parsing library
 ├── pdf.worker.min.mjs      # PDF web worker
-├── server.py               # Optional local server
-├── generate-icons.py       # Python script to regenerate icons
-├── generate-icons.html     # Alternative HTML-based icon generator
 └── icon-*.png              # App icons (9 files)
 ```
 
 ## Usage
 
-1. Run `python3 server.py` for local testing (or open `index.html` directly)
+1. Open `index.html` in your browser
 2. Drag & drop or click to upload PDF bank statements
 3. Enter the PDF password (if required)
 4. Click "Parse" to process the files
@@ -50,7 +47,7 @@ git subtree push --prefix standalone origin gh-pages
 ```
 
 ### Netlify / Vercel
-Drag & drop the `standalone/` folder to deploy.
+Drag & drop the `standalone/` folder contents to deploy.
 
 ### Any Web Server
 Serve the files as-is. The service worker will cache everything for offline use.
