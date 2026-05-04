@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salary Split Calculator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:       #f5f2ed;
+  --paper:    #faf8f5;
+  --ink:      #1a1714;
+  --ink2:     #4a4540;
+  --ink3:     #8a8078;
+  --rule:     #e0d8ce;
+  --rule2:    #ccc4ba;
+  --accent:   #c8402a;
+  --accent2:  #2a6fc8;
+  --green:    #2a7a4a;
+  --red:      #c8402a;
+  --amber:    #b86a10;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'Syne', sans-serif;
+  --r:        3px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* ─── HEADER ─── */
+header {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 16px 28px;
+  border-radius: var(--r);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.logo span { color: var(--accent); }
+
+/* ─── LAYOUT ─── */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+}
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Editable table inputs */
+.table-input {
+  width: 90px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: right;
+  color: var(--ink2);
+  transition: all 0.2s;
+}
+.table-input:hover {
+  border-color: var(--rule2);
+  background: var(--bg);
+}
+.table-input:focus {
+  outline: none;
+  border-color: var(--accent2);
+  background: var(--bg);
+}
+.table-input.text-left {
+  text-align: left;
+  width: 100%;
+}
+.table-input.method-a-input {
+  color: var(--accent2);
+}
+.table-input.method-b-input {
+  color: var(--green);
+}
+.table-input.tax-input {
+  color: var(--red);
+}
+.table-input.base-salary-input {
+  color: var(--ink);
+}
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 16px;
+}
+
+/* Form fields */
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink2);
+  margin-bottom: 6px;
+}
+.input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input:focus { border-color: var(--accent2); }
+.input:hover { border-color: var(--rule2); }
+
+.row { display: flex; gap: 10px; }
+.row .field { flex: 1; }
+
+.btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: var(--r);
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.btn-primary:hover { background: #333; }
+.btn-ghost {
+  background: transparent;
+  border-color: var(--rule2);
+  color: var(--ink2);
+}
+.btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-small { height: 28px; padding: 0 10px; font-size: 11px; }
+
+/* Monthly salary adjustments */
+.month-salary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.month-salary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+.month-salary-item select {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.month-salary-item input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: right;
+}
+.month-salary-item .btn-remove {
+  background: none;
+  border: none;
+  color: var(--ink3);
+  cursor: pointer;
+  padding: 4px;
+}
+.month-salary-item .btn-remove:hover { color: var(--red); }
+
+/* Bonus chips */
+.bonus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.bonus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(184,106,16,0.1);
+  border: 1px solid rgba(184,106,16,0.3);
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--amber);
+}
+.bonus-chip .btn-remove-chip {
+  background: none;
+  border: none;
+  color: var(--amber);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.bonus-chip .btn-remove-chip:hover {
+  opacity: 1;
+}
+
+/* Summary stats */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.summary-card {
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 12px;
+}
+.summary-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 4px;
+}
+.summary-value {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 500;
+}
+.val-green { color: var(--green); }
+.val-blue { color: var(--accent2); }
+.val-amber { color: var(--amber); }
+.val-red { color: var(--red); }
+
+/* ─── MAIN CONTENT ─── */
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Table */
+.table-wrapper {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead {
+  background: var(--ink);
+  color: var(--bg);
+}
+th {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  text-align: left;
+}
+th.text-right { text-align: right; }
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink2);
+}
+td.text-right { text-align: right; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+
+.method-a { color: var(--accent2); }
+.method-b { color: var(--green); }
+.bonus { color: var(--amber); }
+.total { font-weight: 600; }
+
+.month-col { font-family: var(--sans); font-weight: 500; }
+
+/* Bonus section */
+.bonus-section {
+  background: linear-gradient(135deg, rgba(42,127,74,0.08) 0%, rgba(42,127,74,0.03) 100%);
+  border: 1px solid rgba(42,127,74,0.2);
+}
+.bonus-row { background: rgba(184,106,16,0.08); }
+.bonus-row td { font-weight: 500; }
+
+/* Yearly total */
+.total-row {
+  background: var(--ink);
+  color: var(--bg);
+}
+.total-row td {
+  border-top: 2px solid var(--accent);
+  border-bottom: none;
+  font-weight: 600;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ink3);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+.empty-state h3 { font-size: 16px; color: var(--ink2); margin-bottom: 8px; }
+.empty-state p { font-family: var(--mono); font-size: 12px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Salary<span>.</span>Split</div>
+  <span style="font-family:var(--mono);font-size:12px;color:#aaa;">Method A + Method B Calculator</span>
+</header>
+
+<div class="container">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <!-- Default Values -->
+    <div class="card">
+      <div class="card-title">Default Values</div>
+      <div class="row">
+        <div class="field">
+          <label>Default Base Salary</label>
+          <input type="number" id="baseSalary" class="input" value="5000" min="0" step="100" onchange="calculate()">
+        </div>
+        <div class="field">
+          <label>Default Method A Receivable</label>
+          <input type="number" id="methodAReceivable" class="input" value="2500" min="0" step="100" onchange="calculate()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Method Labels</label>
+        <div class="row">
+          <input type="text" id="methodALabel" class="input" value="Method A" placeholder="Method A" onchange="updateLabels()">
+          <input type="text" id="methodBLabel" class="input" value="Method B" placeholder="Method B" onchange="updateLabels()">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Start Month</label>
+          <select id="startMonth" class="input" onchange="calculate()">
+            <option value="0">January</option>
+            <option value="1">February</option>
+            <option value="2">March</option>
+            <option value="3">April</option>
+            <option value="4">May</option>
+            <option value="5">June</option>
+            <option value="6">July</option>
+            <option value="7">August</option>
+            <option value="8" selected>September</option>
+            <option value="9">October</option>
+            <option value="10">November</option>
+            <option value="11">December</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Start Year</label>
+          <select id="startYear" class="input" onchange="calculate()">
+            <option value="2022" selected>2022</option>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>End Month</label>
+          <select id="endMonth" class="input" onchange="calculate()">
+            <option value="0">January</option>
+            <option value="1">February</option>
+            <option value="2">March</option>
+            <option value="3">April</option>
+            <option value="4">May</option>
+            <option value="5">June</option>
+            <option value="6">July</option>
+            <option value="7" selected>August</option>
+            <option value="8">September</option>
+            <option value="9">October</option>
+            <option value="10">November</option>
+            <option value="11">December</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>End Year</label>
+          <select id="endYear" class="input" onchange="calculate()">
+            <option value="2022">2022</option>
+            <option value="2023" selected>2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost" style="flex:1" onclick="resetAmounts()">Reset All Inputs</button>
+      </div>
+      <div class="row">
+        <button class="btn btn-export" style="flex:1" onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <!-- Bonus Settings -->
+    <div class="card">
+      <div class="card-title">Bonus Settings</div>
+      <div class="row">
+        <div class="field">
+          <label>Month</label>
+          <select id="newBonusMonth" class="input">
+            <option value="0">January</option>
+            <option value="1">February</option>
+            <option value="2">March</option>
+            <option value="3">April</option>
+            <option value="4">May</option>
+            <option value="5">June</option>
+            <option value="6">July</option>
+            <option value="7">August</option>
+            <option value="8">September</option>
+            <option value="9">October</option>
+            <option value="10">November</option>
+            <option value="11">December</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Year</label>
+          <select id="newBonusYear" class="input">
+            <option value="2022">2022</option>
+            <option value="2023" selected>2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="addBonus()">+ Add Bonus</button>
+      <div class="bonus-chips" id="bonusChips">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <!-- Base Salary Adjustments -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Base Salary Adjustments</span>
+        <button class="btn btn-ghost btn-small" onclick="addMonthSalary()">+ Add</button>
+      </div>
+      <div class="month-salary-list" id="monthSalaryList">
+        <!-- Dynamically populated -->
+      </div>
+      <p style="font-size:10px;color:var(--ink3);margin-top:10px;">
+        Salary changes take effect from the selected month and apply to all subsequent months.
+      </p>
+    </div>
+
+    <!-- Method A Receivable Adjustments -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Method A Receivable Adjustments</span>
+        <button class="btn btn-ghost btn-small" onclick="addMethodAAdjustment()">+ Add</button>
+      </div>
+      <div class="month-salary-list" id="methodAList">
+        <!-- Dynamically populated -->
+      </div>
+      <p style="font-size:10px;color:var(--ink3);margin-top:10px;">
+        Method A receivable changes take effect from the selected month and apply to all subsequent months.
+      </p>
+    </div>
+
+    <!-- Summary -->
+    <div class="card">
+      <div class="card-title">Yearly Summary</div>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-label">Total Method A Received</div>
+          <div class="summary-value val-blue" id="summaryMethodA">$0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total Method B Received</div>
+          <div class="summary-value val-green" id="summaryMethodB">$0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total Tax Deducted</div>
+          <div class="summary-value val-red" id="summaryTax">$0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Total Bonuses</div>
+          <div class="summary-value val-amber" id="summaryBonus">$0</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+    <div class="table-wrapper">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="text-right">Base Salary</th>
+            <th class="text-right" id="thMethodAReceived">Method A Received</th>
+            <th class="text-right" id="thMethodBReceived">Method B Received</th>
+            <th class="text-right">Tax Deducted</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody">
+          <tr>
+            <td colspan="5">
+              <div class="empty-state">
+                <div class="icon">📊</div>
+                <h3>Enter salary details</h3>
+                <p>Set your base salary and Method A receivable, then adjustments will apply automatically.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Method labels (default values)
+let methodALabel = 'Method A';
+let methodBLabel = 'Method B';
+
+// State for monthly salary adjustments
+let monthSalaries = [];
+// State for monthly actual amounts (Base Salary, Method A Received, Method B Received)
+let monthlyAmounts = {};
+// State for Method A receivable adjustments
+let methodAAdjustments = [];
+// State for bonuses (array of {id, month, year} objects)
+let bonuses = [];
+let nextBonusId = 1;
+// State for bonus received amounts (Method A Received, Method B Received per bonus)
+let bonusAmounts = {};
+
+// Update labels in the UI
+function updateLabels() {
+  methodALabel = document.getElementById('methodALabel').value || 'Method A';
+  methodBLabel = document.getElementById('methodBLabel').value || 'Method B';
+
+  // Update table headers
+  document.getElementById('thMethodAReceived').textContent = `${methodALabel} Received`;
+  document.getElementById('thMethodBReceived').textContent = `${methodBLabel} Received`;
+
+  // Update summary labels
+  document.querySelector('#summaryMethodA').previousElementSibling.textContent = `Total ${methodALabel} Received`;
+  document.querySelector('#summaryMethodB').previousElementSibling.textContent = `Total ${methodBLabel} Received`;
+
+  saveState();
+}
+
+// Add a new bonus
+function addBonus() {
+  const month = parseInt(document.getElementById('newBonusMonth').value);
+  const year = parseInt(document.getElementById('newBonusYear').value);
+
+  // Check for duplicates
+  const exists = bonuses.some(b => b.month === month && b.year === year);
+  if (exists) {
+    alert('A bonus for this month and year already exists.');
+    return;
+  }
+
+  bonuses.push({ id: nextBonusId++, month, year });
+  bonuses.sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  saveState();
+  renderBonusChips();
+  calculate();
+}
+
+// Remove a bonus by ID
+function removeBonus(id) {
+  bonuses = bonuses.filter(b => b.id !== id);
+  saveState();
+  renderBonusChips();
+  calculate();
+}
+
+// Render bonus chips
+function renderBonusChips() {
+  const container = document.getElementById('bonusChips');
+  container.innerHTML = '';
+
+  if (bonuses.length === 0) {
+    container.innerHTML = '<span style="font-size:11px;color:var(--ink3);font-style:italic;">No bonuses added yet</span>';
+    return;
+  }
+
+  bonuses.forEach(bonus => {
+    const chip = document.createElement('div');
+    chip.className = 'bonus-chip';
+    chip.innerHTML = `
+      ${MONTHS[bonus.month]} ${bonus.year}
+      <button class="btn-remove-chip" onclick="removeBonus(${bonus.id})" title="Remove">×</button>
+    `;
+    container.appendChild(chip);
+  });
+}
+
+// Load saved data from localStorage
+function loadState() {
+  const saved = localStorage.getItem('salaryCalcState');
+  if (saved) {
+    const state = JSON.parse(saved);
+    document.getElementById('baseSalary').value = state.baseSalary || 5000;
+    document.getElementById('methodAReceivable').value = state.methodAReceivable || 2500;
+    document.getElementById('methodALabel').value = state.methodALabel || 'Method A';
+    document.getElementById('methodBLabel').value = state.methodBLabel || 'Method B';
+    methodALabel = state.methodALabel || 'Method A';
+    methodBLabel = state.methodBLabel || 'Method B';
+    document.getElementById('startMonth').value = state.startMonth ?? 8;
+    document.getElementById('startYear').value = state.startYear ?? 2022;
+    document.getElementById('endMonth').value = state.endMonth ?? 7;
+    document.getElementById('endYear').value = state.endYear ?? 2023;
+    monthSalaries = state.monthSalaries || [];
+    methodAAdjustments = state.methodAAdjustments || [];
+    monthlyAmounts = state.monthlyAmounts || {};
+    bonuses = state.bonuses || [];
+    bonusAmounts = state.bonusAmounts || {};
+
+    // Update nextBonusId to avoid conflicts
+    if (bonuses.length > 0) {
+      const maxId = Math.max(...bonuses.map(b => b.id || 0));
+      nextBonusId = maxId + 1;
+    }
+
+    // Sort bonuses by date
+    bonuses.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+  } else {
+    bonuses = [];
+    monthSalaries = [];
+    methodAAdjustments = [];
+    monthlyAmounts = {};
+  }
+  renderMonthSalaries();
+  renderMethodAList();
+  renderBonusChips();
+  updateLabels();
+}
+
+// Save state to localStorage
+function saveState() {
+  const state = {
+    baseSalary: document.getElementById('baseSalary').value,
+    methodAReceivable: document.getElementById('methodAReceivable').value,
+    methodALabel: document.getElementById('methodALabel').value,
+    methodBLabel: document.getElementById('methodBLabel').value,
+    startMonth: parseInt(document.getElementById('startMonth').value),
+    startYear: parseInt(document.getElementById('startYear').value),
+    endMonth: parseInt(document.getElementById('endMonth').value),
+    endYear: parseInt(document.getElementById('endYear').value),
+    bonuses: bonuses,
+    monthSalaries: monthSalaries,
+    methodAAdjustments: methodAAdjustments,
+    monthlyAmounts: monthlyAmounts,
+    bonusAmounts: bonusAmounts
+  };
+  localStorage.setItem('salaryCalcState', JSON.stringify(state));
+}
+
+// Render monthly salary adjustment list
+function renderMonthSalaries() {
+  const list = document.getElementById('monthSalaryList');
+  list.innerHTML = '';
+
+  // Sort by date (year, then month)
+  monthSalaries.sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  const yearOptions = [2022, 2023, 2024, 2025, 2026, 2027, 2028].map(y =>
+    `<option value="${y}">${y}</option>`
+  ).join('');
+
+  monthSalaries.forEach((item, index) => {
+    const div = document.createElement('div');
+    div.className = 'month-salary-item';
+    div.innerHTML = `
+      <select onchange="updateMonthSalary(${index}, 'month', this.value)">
+        ${MONTHS.map((m, i) => `<option value="${i}" ${i === item.month ? 'selected' : ''}>${m}</option>`).join('')}
+      </select>
+      <select onchange="updateMonthSalary(${index}, 'year', this.value)">
+        ${yearOptions}
+      </select>
+      <input type="number" value="${item.salary}" min="0" step="100"
+             onchange="updateMonthSalary(${index}, 'salary', this.value)">
+      <button class="btn-remove" onclick="removeMonthSalary(${index})" title="Remove">×</button>
+    `;
+    list.appendChild(div);
+
+    // Set year value
+    const yearSelect = div.querySelector('select:nth-of-type(2)');
+    if (yearSelect) yearSelect.value = item.year;
+  });
+}
+
+// Add a new monthly salary adjustment
+function addMonthSalary() {
+  const startMonth = parseInt(document.getElementById('startMonth').value);
+  const startYear = parseInt(document.getElementById('startYear').value);
+
+  // Check if this date already exists
+  const exists = monthSalaries.some(m => m.month === startMonth && m.year === startYear);
+  if (exists) {
+    alert('An adjustment for this month and year already exists.');
+    return;
+  }
+
+  monthSalaries.push({ month: startMonth, year: startYear, salary: document.getElementById('baseSalary').value });
+  renderMonthSalaries();
+  saveState();
+  calculate();
+}
+
+// Update a monthly salary adjustment
+function updateMonthSalary(index, field, value) {
+  if (field === 'month') {
+    value = parseInt(value);
+    const currentYear = monthSalaries[index].year;
+    // Check if this month/year combination already exists
+    const exists = monthSalaries.some((m, i) => i === index ? false : m.month === value && m.year === currentYear);
+    if (exists) {
+      alert('An adjustment for this month and year already exists.');
+      renderMonthSalaries();
+      return;
+    }
+    monthSalaries[index].month = value;
+  } else if (field === 'year') {
+    value = parseInt(value);
+    const currentMonth = monthSalaries[index].month;
+    // Check if this month/year combination already exists
+    const exists = monthSalaries.some((m, i) => i === index ? false : m.month === currentMonth && m.year === value);
+    if (exists) {
+      alert('An adjustment for this month and year already exists.');
+      renderMonthSalaries();
+      return;
+    }
+    monthSalaries[index].year = value;
+  } else {
+    monthSalaries[index].salary = parseFloat(value) || 0;
+  }
+  renderMonthSalaries();
+  saveState();
+  calculate();
+}
+
+// Remove a monthly salary adjustment
+function removeMonthSalary(index) {
+  monthSalaries.splice(index, 1);
+  renderMonthSalaries();
+  saveState();
+  calculate();
+}
+
+// Render Method A receivable adjustment list
+function renderMethodAList() {
+  const list = document.getElementById('methodAList');
+  list.innerHTML = '';
+
+  // Sort by date (year, then month)
+  methodAAdjustments.sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.month - b.month;
+  });
+
+  const yearOptions = [2022, 2023, 2024, 2025, 2026, 2027, 2028].map(y =>
+    `<option value="${y}">${y}</option>`
+  ).join('');
+
+  methodAAdjustments.forEach((item, index) => {
+    const div = document.createElement('div');
+    div.className = 'month-salary-item';
+    div.innerHTML = `
+      <select onchange="updateMethodAAdjustment(${index}, 'month', this.value)">
+        ${MONTHS.map((m, i) => `<option value="${i}" ${i === item.month ? 'selected' : ''}>${m}</option>`).join('')}
+      </select>
+      <select onchange="updateMethodAAdjustment(${index}, 'year', this.value)">
+        ${yearOptions}
+      </select>
+      <input type="number" value="${item.amount}" min="0" step="100"
+             onchange="updateMethodAAdjustment(${index}, 'amount', this.value)">
+      <button class="btn-remove" onclick="removeMethodAAdjustment(${index})" title="Remove">×</button>
+    `;
+    list.appendChild(div);
+
+    // Set year value
+    const yearSelect = div.querySelector('select:nth-of-type(2)');
+    if (yearSelect) yearSelect.value = item.year;
+  });
+}
+
+// Add a new Method A receivable adjustment
+function addMethodAAdjustment() {
+  const startMonth = parseInt(document.getElementById('startMonth').value);
+  const startYear = parseInt(document.getElementById('startYear').value);
+
+  // Check if this date already exists
+  const exists = methodAAdjustments.some(m => m.month === startMonth && m.year === startYear);
+  if (exists) {
+    alert('An adjustment for this month and year already exists.');
+    return;
+  }
+
+  methodAAdjustments.push({ month: startMonth, year: startYear, amount: document.getElementById('methodAReceivable').value });
+  renderMethodAList();
+  saveState();
+  calculate();
+}
+
+// Update a Method A receivable adjustment
+function updateMethodAAdjustment(index, field, value) {
+  if (field === 'month') {
+    value = parseInt(value);
+    const currentYear = methodAAdjustments[index].year;
+    const exists = methodAAdjustments.some((m, i) => i === index ? false : m.month === value && m.year === currentYear);
+    if (exists) {
+      alert('An adjustment for this month and year already exists.');
+      renderMethodAList();
+      return;
+    }
+    methodAAdjustments[index].month = value;
+  } else if (field === 'year') {
+    value = parseInt(value);
+    const currentMonth = methodAAdjustments[index].month;
+    const exists = methodAAdjustments.some((m, i) => i === index ? false : m.month === currentMonth && m.year === value);
+    if (exists) {
+      alert('An adjustment for this month and year already exists.');
+      renderMethodAList();
+      return;
+    }
+    methodAAdjustments[index].year = value;
+  } else {
+    methodAAdjustments[index].amount = parseFloat(value) || 0;
+  }
+  renderMethodAList();
+  saveState();
+  calculate();
+}
+
+// Remove a Method A receivable adjustment
+function removeMethodAAdjustment(index) {
+  methodAAdjustments.splice(index, 1);
+  renderMethodAList();
+  saveState();
+  calculate();
+}
+
+// Format currency
+function formatMoney(amount) {
+  return '$' + amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+// Export table data to CSV
+function exportCSV() {
+  const baseSalary = parseFloat(document.getElementById('baseSalary').value) || 0;
+  const defaultMethodAReceivable = parseFloat(document.getElementById('methodAReceivable').value) || 0;
+  const startMonth = parseInt(document.getElementById('startMonth').value);
+  const startYear = parseInt(document.getElementById('startYear').value);
+  const endMonth = parseInt(document.getElementById('endMonth').value);
+  const endYear = parseInt(document.getElementById('endYear').value);
+
+  // Generate all months from start to end (inclusive)
+  const monthData = [];
+  let currentMonth = startMonth;
+  let currentYear = startYear;
+
+  while (true) {
+    monthData.push({ monthIndex: currentMonth, year: currentYear });
+    if (currentMonth === endMonth && currentYear === endYear) break;
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+  }
+
+  // Calculate effective salaries and Method A receivables
+  const effectiveSalaries = [];
+  const effectiveMethodAReceivables = [];
+
+  for (let i = 0; i < monthData.length; i++) {
+    const { monthIndex, year } = monthData[i];
+
+    let effectiveSalary = baseSalary;
+    const applicableSalary = monthSalaries.filter(adj => {
+      if (adj.year < year) return true;
+      if (adj.year === year && adj.month <= monthIndex) return true;
+      return false;
+    });
+    if (applicableSalary.length > 0) {
+      applicableSalary.sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+      effectiveSalary = applicableSalary[0].salary;
+    }
+    effectiveSalaries.push(effectiveSalary);
+
+    let effectiveMethodA = defaultMethodAReceivable;
+    const applicableMethodA = methodAAdjustments.filter(adj => {
+      if (adj.year < year) return true;
+      if (adj.year === year && adj.month <= monthIndex) return true;
+      return false;
+    });
+    if (applicableMethodA.length > 0) {
+      applicableMethodA.sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+      effectiveMethodA = applicableMethodA[0].amount;
+    }
+    effectiveMethodAReceivables.push(effectiveMethodA);
+  }
+
+  // Build rows including bonuses
+  const allRows = [];
+
+  for (let i = 0; i < monthData.length; i++) {
+    const { monthIndex, year } = monthData[i];
+    allRows.push({
+      type: 'month',
+      monthIndex,
+      year,
+      sortKey: `${year}-${monthIndex.toString().padStart(2, '0')}-0`,
+      dataIndex: i
+    });
+  }
+
+  bonuses.forEach(bonusSetting => {
+    const bonusDate = new Date(bonusSetting.year, bonusSetting.month, 1);
+    const startDate = new Date(startYear, startMonth, 1);
+    const endDate = new Date(endYear, endMonth, 1);
+
+    if (bonusDate >= startDate && bonusDate <= endDate) {
+      let effectiveSalary = baseSalary;
+      const applicableSalary = monthSalaries.filter(adj => {
+        if (adj.year < bonusSetting.year) return true;
+        if (adj.year === bonusSetting.year && adj.month <= bonusSetting.month) return true;
+        return false;
+      });
+      if (applicableSalary.length > 0) {
+        applicableSalary.sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        });
+        effectiveSalary = applicableSalary[0].salary;
+      }
+
+      let effectiveMethodA = defaultMethodAReceivable;
+      const applicableMethodA = methodAAdjustments.filter(adj => {
+        if (adj.year < bonusSetting.year) return true;
+        if (adj.year === bonusSetting.year && adj.month <= bonusSetting.month) return true;
+        return false;
+      });
+      if (applicableMethodA.length > 0) {
+        applicableMethodA.sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        });
+        effectiveMethodA = applicableMethodA[0].amount;
+      }
+
+      const bonusAmount = effectiveSalary / 2;
+      const bonusMethodAReceivable = effectiveMethodA / 2;
+
+      allRows.push({
+        type: 'bonus',
+        monthIndex: bonusSetting.month,
+        year: bonusSetting.year,
+        sortKey: `${bonusSetting.year}-${bonusSetting.month.toString().padStart(2, '0')}-1`,
+        bonusId: bonusSetting.id,
+        amount: bonusAmount,
+        methodAReceivable: bonusMethodAReceivable
+      });
+    }
+  });
+
+  allRows.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+  // Generate CSV
+  const headers = ['Month', 'Base Salary', `${methodALabel} Received`, `${methodBLabel} Received`, 'Tax Deducted'];
+  let csv = headers.join(',') + '\n';
+
+  allRows.forEach(row => {
+    if (row.type === 'month') {
+      const { monthIndex, year, dataIndex } = row;
+      const key = `${year}-${monthIndex}`;
+      const defaultSalary = effectiveSalaries[dataIndex];
+      const salary = monthlyAmounts[key]?.baseSalary ?? defaultSalary;
+      const methodAReceivable = effectiveMethodAReceivables[dataIndex];
+      const methodAReceived = monthlyAmounts[key]?.methodAReceived ?? methodAReceivable;
+      const methodBReceived = monthlyAmounts[key]?.methodBReceived ?? (salary - methodAReceived);
+      const tax = methodAReceivable - methodAReceived;
+
+      csv += [
+        `"${MONTHS[monthIndex]} ${year}"`,
+        salary.toFixed(2),
+        methodAReceived.toFixed(2),
+        methodBReceived.toFixed(2),
+        tax.toFixed(2)
+      ].join(',') + '\n';
+    } else {
+      const bonusId = row.bonusId;
+      const bonusAmount = row.amount;
+      const bonusMethodAReceivable = row.methodAReceivable;
+      const bonusMethodBDefault = bonusAmount - bonusMethodAReceivable;
+
+      const bonusData = bonusAmounts[bonusId] || { methodAReceived: null, methodBReceived: null };
+      const bonusMethodAReceived = bonusData.methodAReceived ?? 0;
+      const bonusMethodBReceived = bonusData.methodBReceived ?? bonusMethodBDefault;
+      const bonusTax = bonusMethodAReceivable - bonusMethodAReceived;
+
+      csv += [
+        `"Bonus (${MONTHS[row.monthIndex]} ${row.year})"`,
+        bonusAmount.toFixed(2),
+        bonusMethodAReceived.toFixed(2),
+        bonusMethodBReceived.toFixed(2),
+        bonusTax.toFixed(2)
+      ].join(',') + '\n';
+    }
+  });
+
+  // Create download link
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `salary_export_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Main calculation function
+function calculate() {
+  const baseSalary = parseFloat(document.getElementById('baseSalary').value) || 0;
+  const defaultMethodAReceivable = parseFloat(document.getElementById('methodAReceivable').value) || 0;
+  const startMonth = parseInt(document.getElementById('startMonth').value);
+  const startYear = parseInt(document.getElementById('startYear').value);
+  const endMonth = parseInt(document.getElementById('endMonth').value);
+  const endYear = parseInt(document.getElementById('endYear').value);
+
+  saveState();
+
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+
+  // Generate all months from start to end (inclusive)
+  const monthData = [];
+  let currentMonth = startMonth;
+  let currentYear = startYear;
+
+  while (true) {
+    monthData.push({ monthIndex: currentMonth, year: currentYear });
+
+    // Check if we've reached the end
+    if (currentMonth === endMonth && currentYear === endYear) {
+      break;
+    }
+
+    // Move to next month
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+
+    // Safety limit (max 60 months = 5 years)
+    if (monthData.length > 60) {
+      alert('Date range is too large. Maximum 60 months allowed.');
+      return;
+    }
+  }
+
+  const totalMonths = monthData.length;
+
+  let totalMethodAReceived = 0;
+  let totalMethodBReceived = 0;
+  let totalTax = 0;
+  let bonusSum = 0;
+
+  // Calculate effective salary for each period
+  // Salary is determined by finding the most recent adjustment on or before the month
+  let effectiveSalaries = [];
+  let effectiveMethodAReceivables = [];
+
+  for (let i = 0; i < totalMonths; i++) {
+    const { monthIndex, year } = monthData[i];
+
+    // Find the most recent salary adjustment on or before this month
+    let effectiveSalary = baseSalary;
+    const applicableSalaryAdjustments = monthSalaries.filter(adj => {
+      if (adj.year < year) return true;
+      if (adj.year === year && adj.month <= monthIndex) return true;
+      return false;
+    });
+
+    if (applicableSalaryAdjustments.length > 0) {
+      applicableSalaryAdjustments.sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+      effectiveSalary = applicableSalaryAdjustments[0].salary;
+    }
+
+    effectiveSalaries.push(effectiveSalary);
+
+    // Find the most recent Method A receivable adjustment on or before this month
+    let effectiveMethodA = defaultMethodAReceivable;
+    const applicableMethodAAdjustments = methodAAdjustments.filter(adj => {
+      if (adj.year < year) return true;
+      if (adj.year === year && adj.month <= monthIndex) return true;
+      return false;
+    });
+
+    if (applicableMethodAAdjustments.length > 0) {
+      applicableMethodAAdjustments.sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+      effectiveMethodA = applicableMethodAAdjustments[0].amount;
+    }
+
+    effectiveMethodAReceivables.push(effectiveMethodA);
+  }
+
+  // Get or initialize monthly amounts by period index
+  for (let i = 0; i < totalMonths; i++) {
+    const { monthIndex, year } = monthData[i];
+    const key = getMonthKey(monthIndex, year);
+    if (!monthlyAmounts[key]) {
+      monthlyAmounts[key] = {
+        baseSalary: null,
+        methodAReceived: null,
+        methodBReceived: null
+      };
+    }
+  }
+
+  // Build combined list of rows (months and bonuses) for chronological rendering
+  const allRows = [];
+
+  // Add month rows
+  for (let i = 0; i < totalMonths; i++) {
+    const { monthIndex, year } = monthData[i];
+    allRows.push({
+      type: 'month',
+      monthIndex,
+      year,
+      sortKey: `${year}-${monthIndex.toString().padStart(2, '0')}-0`,
+      dataIndex: i
+    });
+  }
+
+  // Add bonus rows that fall within date range
+  const activeBonuses = [];
+
+  bonuses.forEach(bonusSetting => {
+    // Check if this bonus falls within our date range
+    const bonusDate = new Date(bonusSetting.year, bonusSetting.month, 1);
+    const startDate = new Date(startYear, startMonth, 1);
+    const endDate = new Date(endYear, endMonth, 1);
+
+    if (bonusDate >= startDate && bonusDate <= endDate) {
+      // Calculate effective salary for this bonus month
+      let effectiveSalary = baseSalary;
+      const applicableSalaryAdjustments = monthSalaries.filter(adj => {
+        if (adj.year < bonusSetting.year) return true;
+        if (adj.year === bonusSetting.year && adj.month <= bonusSetting.month) return true;
+        return false;
+      });
+
+      if (applicableSalaryAdjustments.length > 0) {
+        applicableSalaryAdjustments.sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        });
+        effectiveSalary = applicableSalaryAdjustments[0].salary;
+      }
+
+      // Calculate effective Method A receivable for this bonus month
+      let effectiveMethodA = defaultMethodAReceivable;
+      const applicableMethodAAdjustments = methodAAdjustments.filter(adj => {
+        if (adj.year < bonusSetting.year) return true;
+        if (adj.year === bonusSetting.year && adj.month <= bonusSetting.month) return true;
+        return false;
+      });
+
+      if (applicableMethodAAdjustments.length > 0) {
+        applicableMethodAAdjustments.sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        });
+        effectiveMethodA = applicableMethodAAdjustments[0].amount;
+      }
+
+      const bonusAmount = effectiveSalary / 2;
+      // Bonus Method A receivable: half of the regular Method A receivable
+      const bonusMethodAReceivable = effectiveMethodA / 2;
+
+      allRows.push({
+        type: 'bonus',
+        monthIndex: bonusSetting.month,
+        year: bonusSetting.year,
+        sortKey: `${bonusSetting.year}-${bonusSetting.month.toString().padStart(2, '0')}-1`,
+        bonusId: bonusSetting.id,
+        amount: bonusAmount,
+        methodAReceivable: bonusMethodAReceivable
+      });
+      activeBonuses.push({ ...bonusSetting, amount: bonusAmount, methodAReceivable: bonusMethodAReceivable });
+    }
+  });
+
+  // Sort all rows chronologically
+  allRows.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+  // Render rows in chronological order
+  allRows.forEach(row => {
+    if (row.type === 'month') {
+      const { monthIndex, year, dataIndex } = row;
+      const key = getMonthKey(monthIndex, year);
+      const defaultSalary = effectiveSalaries[dataIndex];
+      const salary = monthlyAmounts[key].baseSalary ?? defaultSalary;
+      const methodAReceivable = effectiveMethodAReceivables[dataIndex];
+
+      // Method A Received: What was actually received (editable)
+      const methodAReceived = monthlyAmounts[key].methodAReceived ?? methodAReceivable;
+
+      // Method B Received: What was actually received via Method B (editable)
+      // Default: salary - methodAReceived (the remainder)
+      const methodBReceived = monthlyAmounts[key].methodBReceived ?? (salary - methodAReceived);
+
+      // Tax Deducted: Method A Receivable - Method A Received
+      const tax = methodAReceivable - methodAReceived;
+
+      totalMethodAReceived += methodAReceived;
+      totalMethodBReceived += methodBReceived;
+      totalTax += tax;
+
+      const monthLabel = `${MONTHS[monthIndex]} ${year}`;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="month-col">${monthLabel}</td>
+        <td class="text-right">
+          <input type="number" class="table-input text-right" style="width:90px" value="${salary.toFixed(2)}"
+                 onchange="updateAmount('${key}', 'baseSalary', this.value)" placeholder="${defaultSalary.toFixed(2)}">
+        </td>
+        <td class="text-right">
+          <input type="number" class="table-input method-a-input" value="${methodAReceived.toFixed(2)}"
+                 onchange="updateAmount('${key}', 'methodAReceived', this.value)" placeholder="${methodAReceivable.toFixed(2)}">
+        </td>
+        <td class="text-right">
+          <input type="number" class="table-input method-b-input" value="${methodBReceived.toFixed(2)}"
+                 onchange="updateAmount('${key}', 'methodBReceived', this.value)" placeholder="${(salary - methodAReceived).toFixed(2)}">
+        </td>
+        <td class="text-right" style="color: ${tax > 0 ? 'var(--red)' : 'var(--green)'}">${formatMoney(tax)}</td>
+      `;
+      tbody.appendChild(tr);
+    } else {
+      // Bonus row
+      const bonusId = row.bonusId;
+      const bonusAmount = row.amount;
+      const bonusMethodAReceivable = row.methodAReceivable;
+      const bonusMethodBDefault = bonusAmount - bonusMethodAReceivable;
+
+      // Get user-edited values or defaults
+      const bonusData = bonusAmounts[bonusId] || { methodAReceived: null, methodBReceived: null };
+      const bonusMethodAReceived = bonusData.methodAReceived ?? 0;
+      const bonusMethodBReceived = bonusData.methodBReceived ?? bonusMethodBDefault;
+
+      // Tax = Method A Receivable - Method A Received
+      const bonusTax = bonusMethodAReceivable - bonusMethodAReceived;
+
+      bonusSum += bonusAmount;
+      totalMethodAReceived += bonusMethodAReceived;
+      totalMethodBReceived += bonusMethodBReceived;
+      totalTax += bonusTax;
+
+      const bonusRow = document.createElement('tr');
+      bonusRow.className = 'bonus-row';
+      bonusRow.innerHTML = `
+        <td class="month-col">🎁 Bonus (${MONTHS[row.monthIndex]} ${row.year})</td>
+        <td class="text-right bonus">${formatMoney(bonusAmount)}</td>
+        <td class="text-right bonus">
+          <input type="number" class="table-input method-a-input" value="${bonusMethodAReceived.toFixed(2)}"
+                 onchange="updateBonusAmount(${bonusId}, 'methodAReceived', this.value)" placeholder="0.00">
+        </td>
+        <td class="text-right bonus">
+          <input type="number" class="table-input method-b-input" value="${bonusMethodBReceived.toFixed(2)}"
+                 onchange="updateBonusAmount(${bonusId}, 'methodBReceived', this.value)" placeholder="${bonusMethodBDefault.toFixed(2)}">
+        </td>
+        <td class="text-right bonus" style="color: ${bonusTax > 0 ? 'var(--red)' : 'var(--green)'}">${formatMoney(bonusTax)}</td>
+      `;
+      tbody.appendChild(bonusRow);
+    }
+  });
+
+  // Grand total row
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'total-row';
+  totalRow.innerHTML = `
+    <td>Grand Total</td>
+    <td>${totalMonths} Month${totalMonths > 1 ? 's' : ''} + ${activeBonuses.length} Bonus${activeBonuses.length !== 1 ? 'es' : ''}</td>
+    <td class="text-right">${formatMoney(totalMethodAReceived)}</td>
+    <td class="text-right">${formatMoney(totalMethodBReceived)}</td>
+    <td class="text-right">${formatMoney(totalTax)}</td>
+  `;
+  tbody.appendChild(totalRow);
+
+  // Update summary
+  document.getElementById('summaryMethodA').textContent = formatMoney(totalMethodAReceived);
+  document.getElementById('summaryMethodB').textContent = formatMoney(totalMethodBReceived);
+  document.getElementById('summaryTax').textContent = formatMoney(totalTax);
+  document.getElementById('summaryTax').className = 'summary-value ' + (totalTax > 0 ? 'val-red' : 'val-green');
+  document.getElementById('summaryBonus').textContent = formatMoney(bonusSum);
+}
+
+// Update monthly amount and recalculate
+function updateAmount(key, field, value) {
+  const numValue = parseFloat(value);
+
+  // Handle base salary changes as adjustments
+  if (field === 'baseSalary' && !isNaN(numValue)) {
+    // Parse key to get month and year (format: "year-monthIndex")
+    const parts = key.split('-');
+    const year = parseInt(parts[0]);
+    const monthIndex = parseInt(parts[1]);
+
+    // Check if an adjustment already exists for this month/year
+    const existingIndex = monthSalaries.findIndex(m => m.month === monthIndex && m.year === year);
+
+    if (existingIndex >= 0) {
+      // Update existing adjustment
+      monthSalaries[existingIndex].salary = numValue;
+    } else {
+      // Add new adjustment
+      monthSalaries.push({ month: monthIndex, year: year, salary: numValue });
+    }
+
+    // Clear the baseSalary override since we now have an adjustment
+    if (monthlyAmounts[key]) {
+      monthlyAmounts[key].baseSalary = null;
+      monthlyAmounts[key].methodAReceived = null;
+      monthlyAmounts[key].methodBReceived = null;
+    }
+
+    // Sort and update UI
+    monthSalaries.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+
+    renderMonthSalaries();
+    saveState();
+    calculate();
+    return;
+  }
+
+  // For other editable fields (methodAReceived, methodBReceived), use the original behavior
+  if (!monthlyAmounts[key]) {
+    monthlyAmounts[key] = { baseSalary: null, methodAReceived: null, methodBReceived: null };
+  }
+  if (!isNaN(numValue)) {
+    monthlyAmounts[key][field] = numValue;
+  } else {
+    monthlyAmounts[key][field] = null; // Reset to default
+  }
+  saveState();
+  calculate();
+}
+
+// Update bonus received amount and recalculate
+function updateBonusAmount(bonusId, field, value) {
+  const numValue = parseFloat(value);
+  if (!bonusAmounts[bonusId]) {
+    bonusAmounts[bonusId] = { methodAReceived: null, methodBReceived: null };
+  }
+  if (!isNaN(numValue)) {
+    bonusAmounts[bonusId][field] = numValue;
+  } else {
+    bonusAmounts[bonusId][field] = null; // Reset to default
+  }
+  saveState();
+  calculate();
+}
+
+// Reset all monthly amounts to defaults
+function resetAmounts() {
+  if (confirm('Reset all inputs to default values?')) {
+    monthlyAmounts = {};
+    saveState();
+    calculate();
+  }
+}
+
+// Helper to get a unique key for monthly amounts storage
+function getMonthKey(monthIndex, year) {
+  return `${year}-${monthIndex}`;
+}
+
+// Initialize
+loadState();
+// Initial calculation
+calculate();
+</script>
+
+</body>
+</html>

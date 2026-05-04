@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bank Statement Query Tool</title>
+<script src="alasql.min.js"></script>
+<style>
+  /* ── Design: Industrial terminal meets financial ledger ── */
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0d0f11;
+    --surface:   #13171b;
+    --surface2:  #1a1f25;
+    --border:    #252c35;
+    --border2:   #2e3740;
+    --green:     #00e5a0;
+    --green-dim: #00e5a022;
+    --red:       #ff4d6a;
+    --red-dim:   #ff4d6a18;
+    --amber:     #f5a623;
+    --blue:      #4da6ff;
+    --text:      #c8d6e5;
+    --text-dim:  #5a6a7a;
+    --text-mid:  #8a9ab0;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+    --radius:    4px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--green);
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo::before {
+    content: '▶';
+    font-size: 10px;
+  }
+  .header-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  #status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: var(--mono);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: all 0.3s;
+  }
+  #status-badge.loaded {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  #status-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ── Layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: auto 1fr;
+    height: calc(100vh - 52px);
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    grid-row: 1 / -1;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-section {
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+  }
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Load zone */
+  .drop-zone {
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 20px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-mid);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--green);
+    background: var(--green-dim);
+    color: var(--green);
+  }
+  .drop-zone .icon { font-size: 20px; margin-bottom: 6px; display: block; }
+  #file-input { display: none; }
+
+  /* Stats cards */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+  }
+  .stat-card .s-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .stat-card .s-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stat-card.green .s-value { color: var(--green); }
+  .stat-card.red .s-value { color: var(--red); }
+  .stat-card.amber .s-value { color: var(--amber); }
+  .stat-card.blue .s-value { color: var(--blue); }
+
+  /* Saved queries */
+  .query-list { display: flex; flex-direction: column; gap: 4px; }
+  .query-item {
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-mid);
+    transition: all 0.15s;
+    font-family: var(--mono);
+    line-height: 1.3;
+    word-break: break-word;
+  }
+  .query-item:hover {
+    border-color: var(--blue);
+    background: #4da6ff11;
+    color: var(--blue);
+  }
+  .query-item .q-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: var(--sans);
+    margin-bottom: 2px;
+  }
+
+  /* ── Top: SQL editor ── */
+  .editor-pane {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .editor-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .editor-actions { display: flex; gap: 8px; align-items: center; }
+
+  textarea#sql-editor {
+    width: 100%;
+    height: 90px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 10px 14px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+    tab-size: 2;
+  }
+  textarea#sql-editor:focus { border-color: var(--green); }
+  textarea#sql-editor::placeholder { color: var(--text-dim); }
+
+  /* ── Buttons ── */
+  .btn {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: var(--radius);
+    border: 1px solid;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-run {
+    background: var(--green);
+    border-color: var(--green);
+    color: #000;
+  }
+  .btn-run:hover { filter: brightness(1.1); }
+  .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--border2);
+    color: var(--text-mid);
+  }
+  .btn-ghost:hover { border-color: var(--blue); color: var(--blue); }
+  .btn-export {
+    background: transparent;
+    border-color: var(--border2);
+    color: var(--text-mid);
+  }
+  .btn-export:hover { border-color: var(--amber); color: var(--amber); }
+
+  .kbd {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--text-dim);
+  }
+
+  /* ── Results pane ── */
+  .results-pane {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  .results-header {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .results-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .results-meta .highlight { color: var(--text); }
+  .results-meta .err { color: var(--red); }
+
+  /* Error box */
+  .error-box {
+    margin: 16px 20px;
+    padding: 12px 16px;
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--red);
+    display: none;
+  }
+
+  /* Table */
+  .table-wrap {
+    overflow: auto;
+    flex: 1;
+    padding: 0 0 16px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  th:hover { color: var(--blue); }
+  th .sort-icon { font-size: 9px; margin-left: 4px; opacity: 0.5; }
+  th.sorted { color: var(--blue); }
+  th.sorted .sort-icon { opacity: 1; }
+  td {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-mid);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  tr:hover td { background: var(--surface2); color: var(--text); }
+  .cell-debit { color: var(--red) !important; }
+  .cell-credit { color: var(--green) !important; }
+  .cell-date { color: var(--text-mid); }
+  .cell-desc { color: var(--text) !important; max-width: 260px; }
+  .cell-balance { color: var(--amber) !important; }
+  .cell-num { text-align: right; }
+
+  /* Empty / loading states */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: center;
+    padding: 40px;
+  }
+  .empty-state .big { font-size: 32px; }
+  .empty-state .hint { font-size: 11px; color: var(--border2); line-height: 1.7; }
+
+  /* Schema pill */
+  .schema-list { display: flex; flex-direction: column; gap: 3px; }
+  .schema-field {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .schema-field .fname { color: var(--blue); }
+  .schema-field .ftype { color: var(--text-dim); font-size: 10px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* Tooltip */
+  [title] { cursor: help; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">BANK_STATEMENT_QUERY</div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span id="status-badge"><span class="dot"></span><span id="status-text">No data loaded</span></span>
+    <span class="header-meta">Offline · All data stays local</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <!-- Load file -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Load Data</div>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <span class="icon">📂</span>
+        Click to load <strong>data.json</strong><br>
+        <small>or drag &amp; drop</small>
+      </div>
+      <input type="file" id="file-input" accept=".json">
+    </div>
+
+    <!-- Summary stats -->
+    <div class="sidebar-section" id="stats-section" style="display:none">
+      <div class="sidebar-label">Summary</div>
+      <div class="stat-grid">
+        <div class="stat-card blue">
+          <div class="s-label">Transactions</div>
+          <div class="s-value" id="stat-count">—</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="s-label">Files</div>
+          <div class="s-value" id="stat-files">—</div>
+        </div>
+        <div class="stat-card red">
+          <div class="s-label">Total Debit</div>
+          <div class="s-value" id="stat-debit">—</div>
+        </div>
+        <div class="stat-card green">
+          <div class="s-label">Total Credit</div>
+          <div class="s-value" id="stat-credit">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schema -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Schema · transactions</div>
+      <div class="schema-list">
+        <div class="schema-field"><span class="fname">date</span><span class="ftype">TEXT</span></div>
+        <div class="schema-field"><span class="fname">description</span><span class="ftype">TEXT</span></div>
+        <div class="schema-field"><span class="fname">debit</span><span class="ftype">FLOAT</span></div>
+        <div class="schema-field"><span class="fname">credit</span><span class="ftype">FLOAT</span></div>
+        <div class="schema-field"><span class="fname">balance</span><span class="ftype">FLOAT</span></div>
+        <div class="schema-field"><span class="fname">file</span><span class="ftype">TEXT</span></div>
+        <div class="schema-field"><span class="fname">account</span><span class="ftype">TEXT</span></div>
+        <div class="schema-field"><span class="fname">page</span><span class="ftype">INT</span></div>
+        <div class="schema-field"><span class="fname">raw_line</span><span class="ftype">TEXT</span></div>
+      </div>
+    </div>
+
+    <!-- Saved queries -->
+    <div class="sidebar-section" style="flex:1;">
+      <div class="sidebar-label">Example Queries</div>
+      <div class="query-list" id="query-list"></div>
+    </div>
+
+  </aside>
+
+  <!-- ── Right side ── -->
+  <div style="display:flex;flex-direction:column;overflow:hidden;">
+
+    <!-- SQL Editor -->
+    <div class="editor-pane">
+      <div class="editor-header">
+        <span class="editor-title">SQL Query</span>
+        <div class="editor-actions">
+          <span class="kbd">Ctrl+Enter</span>
+          <button class="btn btn-ghost" onclick="clearEditor()">Clear</button>
+          <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ Export CSV</button>
+          <button class="btn btn-run" id="btn-run" onclick="runQuery()" disabled>▶ Run</button>
+        </div>
+      </div>
+      <textarea id="sql-editor" placeholder="SELECT * FROM transactions LIMIT 20" spellcheck="false"></textarea>
+    </div>
+
+    <!-- Results -->
+    <div class="results-pane">
+      <div class="results-header">
+        <div class="results-meta">
+          <span>RESULTS</span>
+          <span id="result-count"></span>
+          <span id="exec-time"></span>
+        </div>
+      </div>
+      <div class="error-box" id="error-box"></div>
+      <div class="table-wrap" id="table-wrap">
+        <div class="empty-state" id="empty-state">
+          <div class="big">📊</div>
+          <div>Load your <strong>data.json</strong> to begin</div>
+          <div class="hint">
+            Run parse.py first:<br>
+            <code>python parse.py ./statements mypassword</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──
+let allData = [];
+let lastResults = [];
+let sortCol = null;
+let sortDir = 1;
+
+// ── Example queries ──
+const EXAMPLE_QUERIES = [
+  { label: "All transactions", sql: "SELECT date, description, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50" },
+  { label: "Monthly spending", sql: "SELECT SUBSTRING(date, 1, 7) AS month,\n  ROUND(SUM(debit), 2) AS total_debit,\n  ROUND(SUM(credit), 2) AS total_credit,\n  COUNT(*) AS tx_count\nFROM transactions\nGROUP BY SUBSTRING(date, 1, 7)\nORDER BY month DESC" },
+  { label: "Biggest debits", sql: "SELECT date, description, debit, file\nFROM transactions\nWHERE debit IS NOT NULL\nORDER BY debit DESC\nLIMIT 20" },
+  { label: "Search merchant", sql: "SELECT date, description, debit, credit\nFROM transactions\nWHERE UPPER(description) LIKE '%AMAZON%'\nORDER BY date DESC" },
+  { label: "Credits only", sql: "SELECT date, description, credit\nFROM transactions\nWHERE credit IS NOT NULL AND credit > 0\nORDER BY credit DESC" },
+  { label: "Per-file summary", sql: "SELECT file,\n  COUNT(*) AS transactions,\n  ROUND(SUM(debit), 2) AS total_out,\n  ROUND(SUM(credit), 2) AS total_in\nFROM transactions\nGROUP BY file\nORDER BY file" },
+  { label: "Date range filter", sql: "SELECT date, description, debit, credit\nFROM transactions\nWHERE date >= '2024-01-01'\n  AND date <= '2024-03-31'\nORDER BY date" },
+  { label: "Recurring amounts", sql: "SELECT debit, COUNT(*) AS occurrences,\n  MIN(description) AS sample_desc\nFROM transactions\nWHERE debit IS NOT NULL\nGROUP BY debit\nHAVING COUNT(*) > 2\nORDER BY occurrences DESC" },
+  { label: "Daily totals", sql: "SELECT date,\n  ROUND(SUM(debit), 2) AS spent,\n  ROUND(SUM(credit), 2) AS received\nFROM transactions\nGROUP BY date\nORDER BY date DESC\nLIMIT 30" },
+  { label: "All columns (raw)", sql: "SELECT * FROM transactions LIMIT 10" },
+];
+
+// Populate sidebar
+const ql = document.getElementById('query-list');
+EXAMPLE_QUERIES.forEach(q => {
+  const el = document.createElement('div');
+  el.className = 'query-item';
+  el.innerHTML = `<div class="q-label">${q.label}</div>${q.sql.split('\n')[0]}…`;
+  el.onclick = () => {
+    document.getElementById('sql-editor').value = q.sql;
+  };
+  ql.appendChild(el);
+});
+
+// ── File loading ──
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadFile(file);
+});
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error("JSON must be an array of transactions");
+      initData(data, file.name);
+    } catch (err) {
+      showError("Failed to parse JSON: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function initData(data, filename) {
+  allData = data;
+
+  // Register table in AlaSQL
+  alasql('DROP TABLE IF EXISTS transactions');
+  alasql('CREATE TABLE transactions');
+  alasql.tables.transactions.data = allData;
+
+  // Update status
+  const badge = document.getElementById('status-badge');
+  badge.className = 'loaded';
+  document.getElementById('status-text').textContent = `${data.length.toLocaleString()} rows · ${filename}`;
+
+  // Stats
+  const totalDebit  = data.reduce((s, r) => s + (r.debit || 0), 0);
+  const totalCredit = data.reduce((s, r) => s + (r.credit || 0), 0);
+  const files       = new Set(data.map(r => r.file)).size;
+
+  document.getElementById('stat-count').textContent  = data.length.toLocaleString();
+  document.getElementById('stat-files').textContent  = files;
+  document.getElementById('stat-debit').textContent  = fmtMoney(totalDebit);
+  document.getElementById('stat-credit').textContent = fmtMoney(totalCredit);
+  document.getElementById('stats-section').style.display = '';
+
+  // Enable buttons
+  document.getElementById('btn-run').disabled    = false;
+  document.getElementById('btn-export').disabled = true; // enable after first run
+
+  // Auto-run a default query
+  const editor = document.getElementById('sql-editor');
+  if (!editor.value.trim()) {
+    editor.value = "SELECT date, description, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50";
+  }
+  runQuery();
+}
+
+// ── Query execution ──
+document.getElementById('sql-editor').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runQuery();
+  }
+  // Tab → 2 spaces
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ta = e.target;
+    const s = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.substring(0, s) + '  ' + ta.value.substring(end);
+    ta.selectionStart = ta.selectionEnd = s + 2;
+  }
+});
+
+function runQuery() {
+  const sql = document.getElementById('sql-editor').value.trim();
+  if (!sql) return;
+  hideError();
+
+  const t0 = performance.now();
+  try {
+    const results = alasql(sql);
+    const elapsed = (performance.now() - t0).toFixed(1);
+
+    if (!Array.isArray(results)) {
+      // Non-SELECT statement
+      document.getElementById('result-count').innerHTML =
+        `<span class="highlight">Query executed (non-SELECT)</span>`;
+      renderTable([]);
+      return;
+    }
+
+    lastResults = results;
+    document.getElementById('result-count').innerHTML =
+      `<span class="highlight">${results.length.toLocaleString()}</span> row${results.length !== 1 ? 's' : ''}`;
+    document.getElementById('exec-time').textContent = `${elapsed}ms`;
+    document.getElementById('btn-export').disabled = results.length === 0;
+
+    renderTable(results);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function clearEditor() {
+  document.getElementById('sql-editor').value = '';
+  document.getElementById('sql-editor').focus();
+}
+
+// ── Table rendering ──
+const DEBIT_COLS  = new Set(['debit']);
+const CREDIT_COLS = new Set(['credit']);
+const DATE_COLS   = new Set(['date']);
+const DESC_COLS   = new Set(['description', 'desc']);
+const BAL_COLS    = new Set(['balance']);
+const NUM_COLS    = new Set(['debit','credit','balance','page']);
+
+function cellClass(col) {
+  if (DEBIT_COLS.has(col))  return 'cell-debit cell-num';
+  if (CREDIT_COLS.has(col)) return 'cell-credit cell-num';
+  if (DATE_COLS.has(col))   return 'cell-date';
+  if (DESC_COLS.has(col))   return 'cell-desc';
+  if (BAL_COLS.has(col))    return 'cell-balance cell-num';
+  if (NUM_COLS.has(col))    return 'cell-num';
+  return '';
+}
+
+function fmtCell(col, val) {
+  if (val === null || val === undefined) return '<span style="color:var(--border2)">—</span>';
+  if ((DEBIT_COLS.has(col) || CREDIT_COLS.has(col) || BAL_COLS.has(col)) && typeof val === 'number') {
+    return fmtMoney(val);
+  }
+  return String(val);
+}
+
+function fmtMoney(n) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderTable(rows) {
+  const wrap = document.getElementById('table-wrap');
+
+  if (!rows || rows.length === 0) {
+    wrap.innerHTML = '<div class="empty-state"><div class="big">∅</div><div>No results</div></div>';
+    return;
+  }
+
+  const cols = Object.keys(rows[0]);
+  sortCol = null; sortDir = 1;
+
+  let html = '<table><thead><tr>';
+  cols.forEach(c => {
+    html += `<th onclick="sortBy('${c}')" data-col="${c}">${c} <span class="sort-icon">⇅</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(row => {
+    html += '<tr>';
+    cols.forEach(c => {
+      const cls = cellClass(c);
+      html += `<td class="${cls}" title="${String(row[c] ?? '').replace(/"/g,'&quot;')}">${fmtCell(c, row[c])}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function sortBy(col) {
+  if (sortCol === col) { sortDir *= -1; }
+  else { sortCol = col; sortDir = 1; }
+
+  const sorted = [...lastResults].sort((a, b) => {
+    const av = a[col], bv = b[col];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return sortDir * (av - bv);
+    return sortDir * String(av).localeCompare(String(bv));
+  });
+
+  renderTable(sorted);
+
+  // Highlight sorted column
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === col);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = th.dataset.col === col ? (sortDir > 0 ? '↑' : '↓') : '⇅';
+  });
+}
+
+// ── Export CSV ──
+function exportCSV() {
+  if (!lastResults.length) return;
+  const cols = Object.keys(lastResults[0]);
+  const rows = [cols.join(',')];
+  lastResults.forEach(row => {
+    rows.push(cols.map(c => {
+      const v = row[c] ?? '';
+      return String(v).includes(',') ? `"${String(v).replace(/"/g, '""')}"` : v;
+    }).join(','));
+  });
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `query_results_${Date.now()}.csv`;
+  a.click();
+}
+
+// ── Error display ──
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = '✗ ' + msg;
+  box.style.display = 'block';
+  document.getElementById('result-count').innerHTML = '<span class="err">Error</span>';
+  document.getElementById('table-wrap').innerHTML =
+    '<div class="empty-state"><div class="big">⚠</div><div>Query failed</div></div>';
+}
+
+function hideError() {
+  document.getElementById('error-box').style.display = 'none';
+}
+</script>
+</body>
+</html>

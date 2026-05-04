@@ -1,0 +1,15 @@
+services:
+  bank-tool:
+    build: .
+    image: bank-tool:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      # Your PDFs go in ./statements/
+      - ./statements:/data/statements:ro
+      # data.json and skipped_lines.json are written here
+      - ./output:/data
+    environment:
+      - PDF_PASSWORD=${PDF_PASSWORD}
+    command: ["run", "${PDF_PASSWORD}", "--port", "8080"]
+    restart: "no"
