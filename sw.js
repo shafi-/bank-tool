@@ -1,7 +1,8 @@
-const CACHE_NAME = 'bankquery-v1';
+const CACHE_NAME = 'bankquery-v2';
 const ASSETS = [
   './',
   './index.html',
+  './app.css',
   './app.js',
   './alasql.min.js',
   './pdf.min.mjs',

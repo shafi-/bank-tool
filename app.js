@@ -731,10 +731,15 @@ window.startParsing = async function() {
   document.getElementById('s-debit').textContent  = fmtMoney(totalDebit);
   document.getElementById('s-credit').textContent = fmtMoney(totalCredit);
   document.getElementById('stats-section').style.display = '';
+  // Hide welcome card when data is loaded
+  const welcomeCard = document.getElementById('welcome-card');
+  if (welcomeCard) welcomeCard.style.display = 'none';
 
-  document.getElementById('btn-run').disabled    = false;
-  document.getElementById('btn-parse').disabled  = false;
-  document.getElementById('btn-save').disabled   = false;
+  document.getElementById('btn-run').disabled     = false;
+  document.getElementById('btn-run-mobile').disabled = false;
+  document.getElementById('btn-parse').disabled   = false;
+  document.getElementById('btn-save').disabled    = false;
+  document.getElementById('btn-save-mobile').disabled = false;
 
   // Auto-run default query
   const sqlEl = document.getElementById('sql');
@@ -881,3 +886,95 @@ function showError(msg) {
 function hideError() {
   document.getElementById('error-msg').style.display = 'none';
 }
+
+// ─── Mobile sidebar toggle ─────────────────────────────────────────────────────
+window.toggleSidebar = function() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('active');
+};
+
+window.closeSidebar = function() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
+};
+
+// Focus upload zone - for welcome card CTA
+// On mobile: opens sidebar; on desktop: triggers file picker
+window.focusUpload = function() {
+  if (window.innerWidth <= 768) {
+    // Mobile: open sidebar
+    toggleSidebar();
+  } else {
+    // Desktop: trigger file picker
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+      dropZone.click();
+    }
+  }
+};
+
+// Toggle password field visibility
+window.togglePasswordField = function() {
+  const checkbox = document.getElementById('pw-protected');
+  const pwRow = document.getElementById('pw-row');
+  if (pwRow) {
+    pwRow.style.display = checkbox.checked ? 'flex' : 'none';
+  }
+};
+
+// ─── Query picker modal (mobile) ───────────────────────────────────────────────
+window.showQueryPicker = function() {
+  const modal = document.getElementById('query-picker-modal');
+  modal.classList.add('active');
+  populateQueryPicker();
+};
+
+window.hideQueryPicker = function() {
+  document.getElementById('query-picker-modal').classList.remove('active');
+};
+
+function populateQueryPicker() {
+  // Populate saved queries
+  const savedSection = document.getElementById('qp-saved-section');
+  const savedList = document.getElementById('qp-saved-list');
+  const savedQueries = getSavedQueries();
+
+  if (savedQueries.length > 0) {
+    savedSection.style.display = '';
+    savedList.innerHTML = '';
+    savedQueries.forEach(q => {
+      const el = document.createElement('button');
+      el.className = 'query-item saved';
+      el.innerHTML = `<span class="q-label">${escapeHtml(q.name)}</span><span class="q-preview">${escapeHtml(q.sql)}</span>`;
+      el.onclick = () => {
+        document.getElementById('sql').value = q.sql;
+        hideQueryPicker();
+      };
+      savedList.appendChild(el);
+    });
+  } else {
+    savedSection.style.display = 'none';
+  }
+
+  // Populate example queries
+  const exampleList = document.getElementById('qp-example-list');
+  if (!exampleList.hasChildNodes()) {
+    EXAMPLES.forEach(q => {
+      const el = document.createElement('button');
+      el.className = 'query-item';
+      el.innerHTML = `<span class="q-label">${q.label}</span><span class="q-preview">${q.sql.split('\n')[0]}…</span>`;
+      el.onclick = () => {
+        document.getElementById('sql').value = q.sql;
+        hideQueryPicker();
+      };
+      exampleList.appendChild(el);
+    });
+  }
+}
+
+// Close query picker on backdrop click
+document.getElementById('query-picker-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'query-picker-modal') {
+    hideQueryPicker();
+  }
+});
