@@ -108,8 +108,14 @@
   <!-- RIGHT SIDE -->
   <div style="display:flex;flex-direction:column;overflow:hidden;">
 
-    <!-- SQL Editor -->
-    <div class="editor-pane">
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="table" onclick="setTableView('table')">▤ Data Table</button>
+      <button class="mode-tab" data-mode="sql" onclick="setTableView('sql')">⌗ SQL Advanced</button>
+    </div>
+
+    <!-- SQL Editor (advanced mode) -->
+    <div class="editor-pane" id="pane-sql" style="display:none">
       <div class="editor-header">
         <span class="editor-title">SQL Query</span>
         <div class="editor-actions">
@@ -133,12 +139,28 @@
       <textarea id="sql" placeholder="SELECT * FROM transactions LIMIT 20" spellcheck="false"></textarea>
     </div>
 
+    <!-- Data Table toolbar (table mode) -->
+    <div class="dt-toolbar" id="pane-table">
+      <div class="dt-group-bar">
+        <span class="dt-group-label">Group by:</span>
+        <button class="dt-chip" data-group="description" onclick="dtSetGroup('description')">Description</button>
+        <button class="dt-chip" data-group="file" onclick="dtSetGroup('file')">File</button>
+        <button class="dt-chip" data-group="date" onclick="dtSetGroup('date')">Month</button>
+        <button class="dt-chip" data-group="debit" onclick="dtSetGroup('debit')">Debit</button>
+        <button class="dt-chip" data-group="credit" onclick="dtSetGroup('credit')">Credit</button>
+        <button class="dt-chip dt-clear" onclick="dtClearGroup()">Clear group</button>
+        <span class="dt-sep"></span>
+        <button class="dt-chip dt-clear" onclick="dtClearFilters()">Clear all filters</button>
+      </div>
+    </div>
+
     <!-- Results -->
     <div class="results-pane">
       <div class="results-bar">
         <div class="results-meta" id="results-meta"><span>RESULTS</span></div>
         <div style="display:flex;gap:12px;align-items:center">
           <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ CSV</button>
+          <button class="btn btn-ghost" id="llm-improve" onclick="showLLMImprove()" style="display:none" title="Get a custom parser from ChatGPT">⬡ Improve with ChatGPT</button>
           <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)" id="exec-time"></span>
         </div>
       </div>
@@ -159,13 +181,31 @@
             </div>
             <div class="welcome-step">
               <span class="step-num">3</span>
-              <span class="step-text">Run SQL queries to analyze</span>
+              <span class="step-text">Filter, group &amp; sort the data table</span>
             </div>
           </div>
           <button class="btn btn-primary btn-large" onclick="focusUpload()">
             <span>📂</span> Upload PDFs to Start
           </button>
         </div>
+      </div>
+
+      <!-- LLM parser (unsupported format) -->
+      <div class="llm-parser-panel" id="llm-parser-panel" style="display:none">
+        <div class="llm-title" id="llm-panel-title">Unsupported statement format</div>
+        <div class="llm-desc" id="llm-panel-desc">
+          The built-in parser found no transactions in <strong id="llm-file-name"></strong>.
+          Get a custom regex from ChatGPT: it opens with a sample of your statement;
+          paste the regex it returns below (with named groups <code>date, description, reference, debit, credit, balance</code>) and we'll run it offline — no code is ever executed.
+        </div>
+        <div class="llm-actions">
+          <button class="btn btn-primary" onclick="openChatGPT()">⬡ Open ChatGPT</button>
+        </div>
+        <textarea id="llm-parser-input" class="llm-input" placeholder="Paste the regex from ChatGPT, e.g. /(?<date>\d{2}-...\s+(?<description>.*?).../g" spellcheck="false"></textarea>
+        <div class="llm-actions">
+          <button class="btn btn-primary" onclick="useLLMParser()">⚡ Use this regex</button>
+        </div>
+        <div class="llm-status" id="llm-status" style="display:none"></div>
       </div>
     </div>
 
