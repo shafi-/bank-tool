@@ -8,7 +8,7 @@ let allData   = [];   // parsed transactions
 let lastRows  = [];   // last query results
 let sortCol   = null;
 let sortDir   = 1;
-let DEBUG = true;  // Set to false to disable console logging
+let DEBUG = false;  // Set to true to enable console logging
 
 // ─── Saved queries (localStorage) ───────────────────────────────────────────
 const SAVED_KEY = 'bankquery_saved_queries';
