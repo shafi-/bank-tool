@@ -65,6 +65,9 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+function escapeAttr(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 // Save prompt functions
 window.showSavePrompt = function() {
@@ -184,7 +187,7 @@ dropZone.addEventListener('drop', e => {
 function setFiles(list) {
   files = list;
   const n = list.length;
-  dropZone.innerHTML = `<span class="icon">📄</span><strong>${n} file${n>1?'s':''} selected</strong><br>${list.map(f=>f.name).join(', ')}`;
+  dropZone.innerHTML = `<span class="icon">📄</span><strong>${n} file${n>1?'s':''} selected</strong><br>${list.map(f=>escapeHtml(f.name)).join(', ')}`;
   btnParse.disabled = false;
 }
 
@@ -1215,7 +1218,7 @@ window.dtClearGroup = function() {
 function dtRowHtml(row) {
   return '<tr>' + DT_COLUMNS.map(c => {
     const cls = cellClass(c.key);
-    return `<td class="${cls}" title="${String(row[c.key]??'').replace(/"/g,'&quot;')}">${fmtCell(c.key, row[c.key])}</td>`;
+    return `<td class="${cls}" title="${escapeAttr(row[c.key]??'')}">${fmtCell(c.key, row[c.key])}</td>`;
   }).join('') + '</tr>';
 }
 
@@ -1304,7 +1307,7 @@ function fmtCell(col, val) {
   if (val === null || val === undefined) return '<span style="color:var(--rule2)">—</span>';
   if ((DEBIT_COLS.has(col)||CREDIT_COLS.has(col)||BAL_COLS.has(col)) && typeof val === 'number')
     return fmtMoney(val);
-  return String(val);
+  return escapeHtml(String(val));
 }
 function fmtMoney(n) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1327,7 +1330,7 @@ function renderTable(rows) {
     html += '<tr>';
     for (const c of cols) {
       const cls = cellClass(c);
-      html += `<td class="${cls}" title="${String(row[c]??'').replace(/"/g,'&quot;')}">${fmtCell(c,row[c])}</td>`;
+      html += `<td class="${cls}" title="${escapeAttr(row[c]??'')}">${fmtCell(c,row[c])}</td>`;
     }
     html += '</tr>';
   }
