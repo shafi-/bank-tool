@@ -806,6 +806,7 @@ window.useLLMParser = function() {
   if (lit) { pattern = lit[1]; if (lit[2]) flags = lit[2]; }
   else { pattern = raw; }
 
+  // Compile on the main thread (no eval). Quick validate before offloading.
   let re;
   try {
     re = new RegExp(pattern, flags.includes('g') ? flags : flags + 'g');
@@ -814,55 +815,89 @@ window.useLLMParser = function() {
     return;
   }
   if (!re.global) re = new RegExp(pattern, (flags + 'g'));
-
-  const named = re.source.includes('?<'); // named groups present?
-  const required = ['date'];
-  const optional = ['description', 'reference', 'debit', 'credit', 'balance'];
-
-  const rows = [];
-  for (const line of llmSample.lines) {
-    re.lastIndex = 0;
-    const m = re.exec(line);
-    if (!m) continue;
-    const g = named ? m.groups : null;
-    const get = key => {
-      if (g && g[key] !== undefined) return g[key];
-      // fallback: positional by index if named groups absent
-      return null;
-    };
-    const date = (get('date') || '').trim();
-    if (!date) continue;
-    const num = v => {
-      if (v === null || v === undefined || v === '') return null;
-      const n = parseFloat(String(v).replace(/,/g, ''));
-      return isNaN(n) ? null : n;
-    };
-    rows.push({
-      date: date,
-      description: String(get('description') || '').trim() || '(no description)',
-      reference: get('reference') ? String(get('reference')).trim() : null,
-      debit: num(get('debit')),
-      credit: num(get('credit')),
-      balance: num(get('balance')),
-      file: llmSample.fileName,
-      account: null,
-      raw_line: line
-    });
-  }
-
-  if (!rows.length) {
-    out.textContent = '✗ No lines matched the regex. Check the named groups (date, description, reference, debit, credit, balance).';
+  if (pattern.length > 2000) {
+    out.textContent = '✗ Regex too long (max 2000 chars).';
     return;
   }
 
-  allData = allData.concat(rows);
-  allData.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  alasql('DROP TABLE IF EXISTS transactions');
-  alasql('CREATE TABLE transactions');
-  alasql.tables.transactions.data = allData;
-  refreshAfterParse();
-  out.textContent = '✓ Parsed ' + rows.length + ' transactions from your regex.';
-  if (ta) ta.value = '';
+  const source = pattern;
+  const named = re.source.includes('?<');
+
+  // Run matching in a Worker with a hard timeout. The worker ONLY compiles a
+  // RegExp and runs exec — it never evaluates user code, touches the DOM, or
+  // accesses the network. The timeout bounds catastrophic-backtracking (ReDoS)
+  // so a malicious/slow regex cannot hang the UI thread.
+  const workerCode = `
+    self.onmessage = function(e) {
+      const { source, flags, lines, file, named } = e.data;
+      const kill = setTimeout(() => { self.postMessage({ error: 'Regex timed out (>2s) — possible catastrophic backtracking. Simplify the pattern.' }); self.close(); }, 2000);
+      try {
+        const re = new RegExp(source, flags.includes('g') ? flags : flags + 'g');
+        const rows = [];
+        for (const line of lines) {
+          if (line.length > 2000) continue;
+          re.lastIndex = 0;
+          const m = re.exec(line);
+          if (!m) continue;
+          const g = named ? m.groups : null;
+          const get = k => (g && g[k] !== undefined) ? g[k] : null;
+          const date = (get('date') || '').trim();
+          if (!date) continue;
+          const num = v => { if (v == null || v === '' ) return null; const n = parseFloat(String(v).replace(/,/g,'')); return isNaN(n) ? null : n; };
+          rows.push({
+            date: date,
+            description: String(get('description') || '').trim() || '(no description)',
+            reference: get('reference') ? String(get('reference')).trim() : null,
+            debit: num(get('debit')),
+            credit: num(get('credit')),
+            balance: num(get('balance')),
+            file: file,
+            account: null,
+            raw_line: line
+          });
+        }
+        clearTimeout(kill);
+        self.postMessage({ rows });
+      } catch (err) {
+        clearTimeout(kill);
+        self.postMessage({ error: String(err && err.message ? err.message : err) });
+      }
+    };
+  `;
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  const workerUrl = URL.createObjectURL(blob);
+  const worker = new Worker(workerUrl);
+  worker.onmessage = function(ev) {
+    if (ev.data.error) {
+      out.textContent = '✗ ' + ev.data.error;
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      return;
+    }
+    const rows = ev.data.rows || [];
+    if (!rows.length) {
+      out.textContent = '✗ No lines matched the regex. Check the named groups (date, description, reference, debit, credit, balance).';
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      return;
+    }
+    allData = allData.concat(rows);
+    allData.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    alasql('DROP TABLE IF EXISTS transactions');
+    alasql('CREATE TABLE transactions');
+    alasql.tables.transactions.data = allData;
+    refreshAfterParse();
+    out.textContent = '✓ Parsed ' + rows.length + ' transactions from your regex.';
+    if (ta) ta.value = '';
+    worker.terminate();
+    URL.revokeObjectURL(workerUrl);
+  };
+  worker.onerror = function() {
+    out.textContent = '✗ Parser worker failed.';
+    worker.terminate();
+    URL.revokeObjectURL(workerUrl);
+  };
+  worker.postMessage({ source, flags, lines: llmSample.lines, file: llmSample.fileName, named });
 };
 };
 
