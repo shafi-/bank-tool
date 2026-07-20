@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bankquery-v2';
+const CACHE_NAME = 'bankquery-v8';
 const ASSETS = [
   './',
   './index.html',
