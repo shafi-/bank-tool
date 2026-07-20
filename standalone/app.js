@@ -8,7 +8,7 @@ let allData   = [];   // parsed transactions
 let lastRows  = [];   // last query results
 let sortCol   = null;
 let sortDir   = 1;
-let DEBUG = true;  // Set to false to disable console logging
+let DEBUG = false;  // Set to true to enable console logging
 
 // ─── Saved queries (localStorage) ───────────────────────────────────────────
 const SAVED_KEY = 'bankquery_saved_queries';
@@ -64,6 +64,9 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+function escapeAttr(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // Save prompt functions
@@ -184,7 +187,7 @@ dropZone.addEventListener('drop', e => {
 function setFiles(list) {
   files = list;
   const n = list.length;
-  dropZone.innerHTML = `<span class="icon">📄</span><strong>${n} file${n>1?'s':''} selected</strong><br>${list.map(f=>f.name).join(', ')}`;
+  dropZone.innerHTML = `<span class="icon">📄</span><strong>${n} file${n>1?'s':''} selected</strong><br>${list.map(f=>escapeHtml(f.name)).join(', ')}`;
   btnParse.disabled = false;
 }
 
@@ -676,6 +679,250 @@ async function parsePDF(file, password) {
   return transactions;
 }
 
+// Raw text lines (used to build an LLM parser sample for unsupported formats)
+async function getRawLines(file, password) {
+  const arrayBuffer = await file.arrayBuffer();
+  const data = new Uint8Array(arrayBuffer);
+  let doc;
+  try {
+    doc = await pdfjsLib.getDocument({ data, password, useWorkerFetch: false, isEvalSupported: false }).promise;
+  } catch (e) {
+    if (e.name === 'PasswordException' || (e.message && e.message.toLowerCase().includes('password'))) {
+      throw new Error(`Wrong password for "${file.name}"`);
+    }
+    throw e;
+  }
+  const lines = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    for (const line of groupItemsByLine(content.items)) {
+      const t = line.text.trim();
+      if (t) lines.push(t);
+    }
+  }
+  return lines;
+}
+
+// ─── LLM (ChatGPT) parser paste-in ──────────────────────────────────────────
+// For formats the built-in parser can't handle: the user opens a prefilled
+// ChatGPT link with a sample, pastes back a `parse(lines, file)` function, and
+// we run it inside a sandboxed Web Worker (no DOM / network / imports).
+let llmSample = { fileName: '', lines: [] };
+
+window.showLLMImprove = function() {
+  const panel = document.getElementById('llm-parser-panel');
+  if (!panel) return;
+  panel.style.display = '';
+  const nameEl = document.getElementById('llm-file-name');
+  if (nameEl) nameEl.textContent = llmSample.fileName || nameEl.textContent;
+  updateLLMButton();
+  panel.scrollIntoView({ behavior: 'smooth' });
+};
+
+// Button title reflects how many rows the built-in parser already found.
+function updateLLMButton() {
+  const btn = document.getElementById('llm-improve');
+  if (!btn) return;
+  const n = allData.length;
+  if (n === 0) {
+    btn.textContent = '⬡ Get parser from ChatGPT';
+    btn.title = 'Built-in parser found no transactions. Get a custom parser from ChatGPT.';
+  } else {
+    btn.textContent = '⬡ Improve with ChatGPT';
+    btn.title = 'Built-in parser found ' + n.toLocaleString() + ' rows. Get a more accurate parser from ChatGPT.';
+  }
+}
+
+// Build a self-contained spec prompt: example lines + attributes to extract +
+// the exact output contract the app expects. Does NOT rely on the built-in parser.
+// Redact sensitive data from a line before sending to ChatGPT:
+// account/IBAN numbers, long digit runs (amounts, references), and any
+// remaining card-like sequences are masked. Structure is preserved so the
+// model can still learn the column layout.
+function redactLine(line) {
+  let s = line;
+  // IBAN / account numbers (letters + long digits, or 8+ digit runs)
+  s = s.replace(/\b[A-Z]{2}\d{2}[A-Z0-9]{4,}\b/g, '<IBAN>');
+  s = s.replace(/\b(?:\d[ \-]?){8,}\b/g, '<ACCOUNT>');
+  // Money amounts: with decimals, or integers >= 100 (likely money, not a year/ref)
+  s = s.replace(/\d{1,3}(?:[,\s]\d{3})*\.\d{2}\b/g, '<AMOUNT>');
+  s = s.replace(/\b(?:[1-9]\d{2,3}(?:[,\s]\d{3})*)\b/g, '<AMOUNT>');
+  // Card / sort-code-like digits and any remaining long numeric refs
+  s = s.replace(/\b\d{4,}\b/g, '<NUM>');
+  return s;
+}
+
+function buildParserPrompt() {
+  // Pick up to 3 transaction-like lines (contain a date AND some digits).
+  const candidates = llmSample.lines.filter(l =>
+    /\d{1,2}[\/\-]\d{1,2}([\/\-]\d{2,4})?|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(l) && /\d/.test(l)
+  );
+  const picked = (candidates.length ? candidates : llmSample.lines).slice(0, 3);
+  const exampleLines = picked.map(redactLine).join('\n');
+  return [
+    'Write a single JavaScript REGULAR EXPRESSION (regex) that extracts transaction fields from bank statement text lines.',
+    '',
+    'The app will run your regex against each line and read its NAMED CAPTURE GROUPS. Use these exact group names (any subset, but `date` is required):',
+    '  • date        — the transaction date',
+    '  • description — the payee / transaction description',
+    '  • reference   — cheque no. or reference (optional)',
+    '  • debit       — money OUT (optional)',
+    '  • credit      — money IN (optional)',
+    '  • balance     — running balance (optional)',
+    '',
+    'RETURN ONLY A REGEX LITERAL with named groups, e.g.:',
+    '  /(?<date>\\d{2}-[A-Za-z]{3}-\\d{4})\\s+(?<description>.*?)\\s+(?<debit>[\\d,]+(?:\\.\\d{2}))\\s*(?:DR)/g',
+    '',
+    'RULES:',
+    '  • Return ONLY the regex literal. No explanation, no markdown code fences, and NO JavaScript function or code.',
+    '  • Use named groups with the exact names above.',
+    '  • Do NOT write code that executes; the app interprets the regex itself.',
+    '',
+    'EXAMPLE RAW LINES (sensitive values redacted as <IBAN>/<ACCOUNT>/<AMOUNT>/<NUM>):',
+    exampleLines
+  ].join('\n');
+}
+
+window.openChatGPT = function() {
+  if (!llmSample.lines.length) return;
+  updateLLMButton();
+  const prompt = buildParserPrompt();
+  const url = 'https://chat.openai.com/?prompt=' + encodeURIComponent(prompt);
+  window.open(url, '_blank', 'noopener');
+};
+
+// Interpret a pasted regex (declarative — never executed as code) into rows.
+// The regex must use named groups: date, description, reference, debit,
+// credit, balance (any subset). We compile it with RegExp (no eval) and apply
+// it to each raw line. This eliminates arbitrary-code-execution risk entirely.
+window.useLLMParser = function() {
+  const ta = document.getElementById('llm-parser-input');
+  const raw = (ta?.value || '').trim();
+  if (!raw) return;
+  const out = document.getElementById('llm-status');
+  out.style.display = '';
+
+  // Accept either a /pattern/flags literal or a bare pattern.
+  let pattern, flags = 'g';
+  const lit = raw.match(/^\/(.*)\/([gimsuy]*)$/s);
+  if (lit) { pattern = lit[1]; if (lit[2]) flags = lit[2]; }
+  else { pattern = raw; }
+
+  // Compile on the main thread (no eval). Quick validate before offloading.
+  let re;
+  try {
+    re = new RegExp(pattern, flags.includes('g') ? flags : flags + 'g');
+  } catch (e) {
+    out.textContent = '✗ Invalid regex: ' + e.message;
+    return;
+  }
+  if (!re.global) re = new RegExp(pattern, (flags + 'g'));
+  if (pattern.length > 2000) {
+    out.textContent = '✗ Regex too long (max 2000 chars).';
+    return;
+  }
+
+  const source = pattern;
+  const named = re.source.includes('?<');
+
+  // Run matching in a Worker with a hard timeout. The worker ONLY compiles a
+  // RegExp and runs exec — it never evaluates user code, touches the DOM, or
+  // accesses the network. The timeout bounds catastrophic-backtracking (ReDoS)
+  // so a malicious/slow regex cannot hang the UI thread.
+  const workerCode = `
+    self.onmessage = function(e) {
+      const { source, flags, lines, file, named } = e.data;
+      const kill = setTimeout(() => { self.postMessage({ error: 'Regex timed out (>2s) — possible catastrophic backtracking. Simplify the pattern.' }); self.close(); }, 2000);
+      try {
+        const re = new RegExp(source, flags.includes('g') ? flags : flags + 'g');
+        const rows = [];
+        for (const line of lines) {
+          if (line.length > 2000) continue;
+          re.lastIndex = 0;
+          const m = re.exec(line);
+          if (!m) continue;
+          const g = named ? m.groups : null;
+          const get = k => (g && g[k] !== undefined) ? g[k] : null;
+          const date = (get('date') || '').trim();
+          if (!date) continue;
+          const num = v => { if (v == null || v === '' ) return null; const n = parseFloat(String(v).replace(/,/g,'')); return isNaN(n) ? null : n; };
+          rows.push({
+            date: date,
+            description: String(get('description') || '').trim() || '(no description)',
+            reference: get('reference') ? String(get('reference')).trim() : null,
+            debit: num(get('debit')),
+            credit: num(get('credit')),
+            balance: num(get('balance')),
+            file: file,
+            account: null,
+            raw_line: line
+          });
+        }
+        clearTimeout(kill);
+        self.postMessage({ rows });
+      } catch (err) {
+        clearTimeout(kill);
+        self.postMessage({ error: String(err && err.message ? err.message : err) });
+      }
+    };
+  `;
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  const workerUrl = URL.createObjectURL(blob);
+  const worker = new Worker(workerUrl);
+  worker.onmessage = function(ev) {
+    if (ev.data.error) {
+      out.textContent = '✗ ' + ev.data.error;
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      return;
+    }
+    const rows = ev.data.rows || [];
+    if (!rows.length) {
+      out.textContent = '✗ No lines matched the regex. Check the named groups (date, description, reference, debit, credit, balance).';
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+      return;
+    }
+    allData = allData.concat(rows);
+    allData.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    alasql('DROP TABLE IF EXISTS transactions');
+    alasql('CREATE TABLE transactions');
+    alasql.tables.transactions.data = allData;
+    refreshAfterParse();
+    out.textContent = '✓ Parsed ' + rows.length + ' transactions from your regex.';
+    if (ta) ta.value = '';
+    worker.terminate();
+    URL.revokeObjectURL(workerUrl);
+  };
+  worker.onerror = function() {
+    out.textContent = '✗ Parser worker failed.';
+    worker.terminate();
+    URL.revokeObjectURL(workerUrl);
+  };
+  worker.postMessage({ source, flags, lines: llmSample.lines, file: llmSample.fileName, named });
+};
+};
+
+function refreshAfterParse() {
+  const badge = document.getElementById('badge');
+  badge.className = 'badge ok';
+  document.getElementById('badge-text').textContent = `${allData.length.toLocaleString()} rows loaded`;
+  const totalDebit  = allData.reduce((s, r) => s + (r.debit  || 0), 0);
+  const totalCredit = allData.reduce((s, r) => s + (r.credit || 0), 0);
+  const fileCount   = new Set(allData.map(r => r.file)).size;
+  document.getElementById('s-count').textContent  = allData.length.toLocaleString();
+  document.getElementById('s-files').textContent  = fileCount;
+  document.getElementById('s-debit').textContent  = fmtMoney(totalDebit);
+  document.getElementById('s-credit').textContent = fmtMoney(totalCredit);
+  document.getElementById('stats-section').style.display = '';
+  const welcomeCard = document.getElementById('welcome-card');
+  if (welcomeCard) welcomeCard.style.display = 'none';
+  const panel = document.getElementById('llm-parser-panel');
+  if (panel) panel.style.display = 'none';
+  setTableView('table');
+}
+
 // ─── Parse orchestration ────────────────────────────────────────────────────
 window.startParsing = async function() {
   if (!files.length) return;
@@ -694,6 +941,7 @@ window.startParsing = async function() {
 
   allData = [];
   let done = 0;
+  const unsupported = [];
 
   for (const file of files) {
     addLog(`⏳ ${file.name}…`);
@@ -701,14 +949,44 @@ window.startParsing = async function() {
       const txns = await parsePDF(file, password);
       allData.push(...txns);
       addLog(`✓ ${file.name} → ${txns.length} transactions`);
+      if (!txns.length) unsupported.push(file);
     } catch (e) {
       addLog(`✗ ${file.name}: ${e.message}`);
+      unsupported.push(file);
     }
     done++;
     bar.style.width = `${(done / files.length) * 100}%`;
   }
 
   addLog(`─ Done: ${allData.length} total transactions`);
+
+  // Capture a sample from the first file so "Improve with ChatGPT" is available
+  // whenever data is loaded (not only on parse failure).
+  const sampleFile = files[0];
+  try {
+    const raw = await getRawLines(sampleFile, password);
+    llmSample = { fileName: sampleFile.name, lines: raw };
+  } catch (e) {
+    addLog(`✗ Could not extract sample: ${e.message}`);
+  }
+
+  // If a file produced no transactions, show the full LLM parser panel.
+  if (unsupported.length && allData.length === 0) {
+    const panel = document.getElementById('llm-parser-panel');
+    if (panel) {
+      panel.style.display = '';
+      const nameEl = document.getElementById('llm-file-name');
+      if (nameEl) nameEl.textContent = sampleFile.name;
+    }
+  } else if (allData.length > 0) {
+    // Built-in parser succeeded: offer "Improve statement parsing with ChatGPT".
+    const improve = document.getElementById('llm-improve');
+    if (improve) {
+      improve.style.display = '';
+      updateLLMButton();
+    }
+  }
+  }
 
   // Sort by date
   allData.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -741,12 +1019,12 @@ window.startParsing = async function() {
   document.getElementById('btn-save').disabled    = false;
   document.getElementById('btn-save-mobile').disabled = false;
 
-  // Auto-run default query
+  // Default into the no-SQL data-table view; keep SQL prefilled for advanced mode
   const sqlEl = document.getElementById('sql');
   if (!sqlEl.value.trim()) {
     sqlEl.value = "SELECT date, description, reference, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50";
   }
-  runQuery();
+  setTableView('table');
 };
 
 // ─── SQL query execution ─────────────────────────────────────────────────────
@@ -786,9 +1064,214 @@ window.runQuery = function() {
 };
 
 window.clearSQL  = () => { document.getElementById('sql').value = ''; document.getElementById('sql').focus(); };
-window.exportCSV = () => {
+// ─── Data-table mode (no-SQL advanced table) ────────────────────────────────
+// Operates directly on `allData` (the in-memory transactions table).
+let tableView = 'table';          // 'table' | 'sql'
+const DT_COLUMNS = [
+  { key: 'date',        label: 'Date',        type: 'date' },
+  { key: 'description', label: 'Description', type: 'text' },
+  { key: 'reference',   label: 'Reference',   type: 'text' },
+  { key: 'debit',       label: 'Debit',       type: 'number' },
+  { key: 'credit',      label: 'Credit',      type: 'number' },
+  { key: 'balance',     label: 'Balance',     type: 'number' },
+  { key: 'file',        label: 'File',        type: 'category' },
+];
+const DT_TYPE_OPTIONS = {
+  text:    [['contains','Contains'],['eq','Equals'],['starts','Starts with'],['empty','Is empty']],
+  number:  [['eq','='],['gte','≥'],['lte','≤'],['between','Between'],['empty','Is empty']],
+  date:    [['gte','From'],['lte','To'],['between','Range'],['empty','Is empty']],
+  category:[['eq','Equals'],['neq','Not equals'],['empty','Is empty']],
+};
+// Per-column filter state: { op, value, value2 }
+const dtFilters = {};
+// Group-by key (one of DT_COLUMNS.key) or null
+let dtGroupBy = null;
+// Sort state shared with header clicks
+let dtSortCol = null;
+let dtSortDir = 1;
+// Debounce timers per column/field for live filter inputs
+const dtDebounceTimers = {};
+
+function dtColumnType(key) {
+  return DT_COLUMNS.find(c => c.key === key)?.type || 'text';
+}
+
+function dtApplyFilters(rows) {
+  return rows.filter(r => {
+    for (const key in dtFilters) {
+      const f = dtFilters[key];
+      if (!f || !f.op) continue;
+      const raw = r[key];
+      const type = dtColumnType(key);
+      const empty = raw === null || raw === undefined || raw === '';
+      if (f.op === 'empty') {
+        if (!empty) return false;
+        continue;
+      }
+      if (empty) return false;
+      if (type === 'text') {
+        const s = String(raw).toLowerCase();
+        const v = String(f.value || '').toLowerCase();
+        if (f.op === 'contains' && !s.includes(v)) return false;
+        if (f.op === 'eq' && s !== v) return false;
+        if (f.op === 'starts' && !s.startsWith(v)) return false;
+      } else if (type === 'number') {
+        const n = Number(raw);
+        if (f.op === 'eq' && n !== Number(f.value)) return false;
+        if (f.op === 'gte' && n < Number(f.value)) return false;
+        if (f.op === 'lte' && n > Number(f.value)) return false;
+        if (f.op === 'between' && (n < Number(f.value) || n > Number(f.value2))) return false;
+      } else if (type === 'date') {
+        const d = String(raw);
+        if (f.op === 'gte' && d < f.value) return false;
+        if (f.op === 'lte' && d > f.value) return false;
+        if (f.op === 'between' && (d < f.value || d > f.value2)) return false;
+      } else if (type === 'category') {
+        const s = String(raw);
+        if (f.op === 'eq' && s !== f.value) return false;
+        if (f.op === 'neq' && s === f.value) return false;
+      }
+    }
+    return true;
+  });
+}
+
+function dtSort(rows) {
+  if (!dtSortCol) return rows;
+  const col = dtSortCol;
+  const type = dtColumnType(col);
+  return [...rows].sort((a, b) => {
+    const av = a[col], bv = b[col];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (type === 'number') return dtSortDir * (Number(av) - Number(bv));
+    return dtSortDir * String(av).localeCompare(String(bv));
+  });
+}
+
+function dtGroup(rows) {
+  if (!dtGroupBy) return [{ key: null, label: null, rows }];
+  const map = new Map();
+  for (const r of rows) {
+    let gk = r[dtGroupBy];
+    if (gk === null || gk === undefined || gk === '') gk = '(blank)';
+    if (dtGroupBy === 'date' && typeof gk === 'string' && gk.length >= 7) gk = gk.slice(0, 7); // month
+    if (!map.has(gk)) map.set(gk, []);
+    map.get(gk).push(r);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => String(a).localeCompare(String(b)))
+    .map(([k, rs]) => ({ key: k, label: `${DT_COLUMNS.find(c=>c.key===dtGroupBy)?.label}: ${k}`, rows: rs }));
+}
+
+// Build the filter toolbar markup for the data-table header row
+function dtFilterControls() {
+  return DT_COLUMNS.map(c => {
+    const f = dtFilters[c.key] || {};
+    const ops = DT_TYPE_OPTIONS[c.type]
+      .map(([v,l]) => `<option value="${v}" ${f.op===v?'selected':''}>${l}</option>`).join('');
+    return `<th data-col="${c.key}">
+      <div class="dt-th-label" onclick="dtSortClick('${c.key}')">${c.label}<span class="si">${dtSortCol===c.key?(dtSortDir>0?'↑':'↓'):'⇅'}</span></div>
+      <select class="dt-op" onchange="dtOpChange('${c.key}',this.value)">${ops}</select>
+      <input class="dt-val" type="text" placeholder="value" value="${f.value??''}" oninput="dtValChange('${c.key}','value',this.value)">
+      ${(c.type==='number'||c.type==='date') ? `<input class="dt-val2" type="text" placeholder="to" value="${f.value2??''}" oninput="dtValChange('${c.key}','value2',this.value)">` : ''}
+    </th>`;
+  }).join('');
+}
+
+window.dtOpChange = function(key, op) {
+  if (!dtFilters[key]) dtFilters[key] = {};
+  dtFilters[key].op = op;
+  if (!op) delete dtFilters[key];
+  dtRender();
+};
+window.dtValChange = function(key, which, val) {
+  if (!dtFilters[key]) dtFilters[key] = {};
+  dtFilters[key][which] = val;
+  // Live-but-debounced: operator change re-renders instantly; value typing waits 250ms
+  if (!dtDebounceTimers[key]) dtDebounceTimers[key] = {};
+  clearTimeout(dtDebounceTimers[key][which]);
+  dtDebounceTimers[key][which] = setTimeout(dtRender, 250);
+};
+window.dtSortClick = function(key) {
+  if (dtSortCol === key) dtSortDir *= -1;
+  else { dtSortCol = key; dtSortDir = 1; }
+  dtRender();
+};
+window.dtSetGroup = function(key) {
+  dtGroupBy = (dtGroupBy === key) ? null : key;
+  document.querySelectorAll('.dt-chip[data-group]').forEach(c => {
+    c.classList.toggle('active', c.dataset.group === dtGroupBy);
+  });
+  dtRender();
+};
+window.dtClearFilters = function() {
+  for (const k in dtFilters) { delete dtFilters[k]; if (dtDebounceTimers[k]) for (const w in dtDebounceTimers[k]) clearTimeout(dtDebounceTimers[k][w]); }
+  dtRender();
+};
+window.dtClearGroup = function() {
+  dtGroupBy = null;
+  dtRender();
+};
+
+function dtRowHtml(row) {
+  return '<tr>' + DT_COLUMNS.map(c => {
+    const cls = cellClass(c.key);
+    return `<td class="${cls}" title="${escapeAttr(row[c.key]??'')}">${fmtCell(c.key, row[c.key])}</td>`;
+  }).join('') + '</tr>';
+}
+
+function dtRender() {
+  const wrap = document.getElementById('table-wrap');
+  if (tableView !== 'table') return;
+  let rows = dtApplyFilters(allData);
+  rows = dtSort(rows);
+  const groups = dtGroup(rows);
+
+  const total = rows.length;
+  document.getElementById('results-meta').innerHTML =
+    `<span>DATA TABLE</span><span><span class="hi">${total.toLocaleString()}</span> row${total!==1?'s':''}${dtGroupBy?' · grouped by '+dtGroupBy:''}</span>`;
+  document.getElementById('exec-time').textContent = '';
+  document.getElementById('btn-export').disabled = total === 0;
+  lastRows = rows;
+
+  if (!total) {
+    wrap.innerHTML = '<div class="empty-state"><div class="big">∅</div><div class="title">No rows match filters</div></div>';
+    return;
+  }
+
+  let html = '<table class="dt-table"><thead><tr>' + dtFilterControls() + '</tr></thead><tbody>';
+  if (dtGroupBy) {
+    for (const g of groups) {
+      const sumD = g.rows.reduce((s,r)=>s+(r.debit||0),0);
+      const sumC = g.rows.reduce((s,r)=>s+(r.credit||0),0);
+      html += `<tr class="dt-group"><td colspan="${DT_COLUMNS.length}">${escapeHtml(g.label)} · ${g.rows.length} rows · ${fmtMoney(sumD)} out / ${fmtMoney(sumC)} in</td></tr>`;
+      html += g.rows.map(dtRowHtml).join('');
+    }
+  } else {
+    html += rows.map(dtRowHtml).join('');
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// Mode switching
+window.setTableView = function(mode) {
+  tableView = mode;
+  document.getElementById('pane-sql').style.display    = (mode === 'sql') ? '' : 'none';
+  document.getElementById('pane-table').style.display  = (mode === 'table') ? '' : 'none';
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  if (mode === 'table') dtRender();
+  else { /* SQL pane: re-run current query */ }
+};
+
+// Export reflects current view
+window.exportCSV = function() {
   if (!lastRows.length) return;
-  const cols = Object.keys(lastRows[0]);
+  const cols = (tableView === 'table')
+    ? DT_COLUMNS.map(c => c.key)
+    : (lastRows[0] ? Object.keys(lastRows[0]) : []);
   const lines = [cols.join(',')];
   for (const row of lastRows) {
     lines.push(cols.map(c => {
@@ -798,7 +1281,7 @@ window.exportCSV = () => {
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-  a.download = `query_${Date.now()}.csv`;
+  a.download = `bankquery_${Date.now()}.csv`;
   a.click();
 };
 
@@ -824,7 +1307,7 @@ function fmtCell(col, val) {
   if (val === null || val === undefined) return '<span style="color:var(--rule2)">—</span>';
   if ((DEBIT_COLS.has(col)||CREDIT_COLS.has(col)||BAL_COLS.has(col)) && typeof val === 'number')
     return fmtMoney(val);
-  return String(val);
+  return escapeHtml(String(val));
 }
 function fmtMoney(n) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -847,7 +1330,7 @@ function renderTable(rows) {
     html += '<tr>';
     for (const c of cols) {
       const cls = cellClass(c);
-      html += `<td class="${cls}" title="${String(row[c]??'').replace(/"/g,'&quot;')}">${fmtCell(c,row[c])}</td>`;
+      html += `<td class="${cls}" title="${escapeAttr(row[c]??'')}">${fmtCell(c,row[c])}</td>`;
     }
     html += '</tr>';
   }

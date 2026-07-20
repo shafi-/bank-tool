@@ -667,6 +667,177 @@ textarea#sql {
 textarea#sql:focus { border-color: var(--accent2); }
 textarea#sql::placeholder { color: var(--ink3); }
 
+/* ─── MODE TABS ─── */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 22px 0;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+.mode-tab {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--ink3);
+  padding: 8px 14px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.mode-tab:hover { color: var(--ink); background: var(--bg); }
+.mode-tab.active {
+  color: var(--accent2);
+  background: var(--bg);
+  border-color: var(--rule);
+  font-weight: 600;
+}
+
+/* ─── DATA TABLE TOOLBAR ─── */
+.dt-toolbar {
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  padding: 10px 22px;
+}
+.dt-group-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dt-group-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink3);
+  margin-right: 2px;
+}
+.dt-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: 14px;
+  padding: 4px 12px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dt-chip:hover { border-color: var(--accent2); color: var(--accent2); }
+.dt-chip.active {
+  background: var(--accent2);
+  border-color: var(--accent2);
+  color: #0c0a08;
+  font-weight: 600;
+}
+.dt-chip.dt-clear { color: var(--ink3); }
+.dt-chip.dt-clear:hover { color: var(--red); border-color: var(--red); }
+.dt-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--rule2);
+  margin: 0 4px;
+}
+
+/* ─── DATA TABLE FILTER HEADER ─── */
+table.dt-table thead { position: static; }
+table.dt-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 4;
+  vertical-align: top;
+  border-bottom: 2px solid var(--rule2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+table.dt-table thead th::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -2px;
+  height: 2px;
+}
+.dt-th-label {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent2);
+  user-select: none;
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+.dt-th-label:hover { color: var(--ink); }
+.dt-th-label .si { color: var(--ink3); font-weight: 400; margin-left: 4px; }
+.dt-op, .dt-val, .dt-val2 {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 3px 5px;
+  outline: none;
+}
+.dt-op { color: var(--ink3); }
+.dt-op:focus, .dt-val:focus, .dt-val2:focus { border-color: var(--accent2); }
+.dt-val2 { margin-top: 2px; }
+tr.dt-group td {
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent2);
+  padding: 8px 14px !important;
+  border-bottom: 1px solid var(--rule2);
+}
+
+/* ─── LLM PARSER PANEL ─── */
+.llm-parser-panel {
+  margin: 16px 22px;
+  padding: 18px;
+  background: var(--paper);
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+}
+.llm-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber);
+  margin-bottom: 6px;
+}
+.llm-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink2);
+  margin-bottom: 12px;
+}
+.llm-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.llm-input {
+  width: 100%;
+  height: 140px;
+  background: var(--bg);
+  border: 1px solid var(--rule2);
+  border-radius: var(--r);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+}
+.llm-input:focus { border-color: var(--accent2); }
+.llm-status {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink2);
+}
+
 /* ─── RESULTS ─── */
 .results-pane {
   overflow: hidden;
