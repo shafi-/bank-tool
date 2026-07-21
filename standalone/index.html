@@ -155,7 +155,7 @@
         <div class="results-meta" id="results-meta"><span>RESULTS</span></div>
         <div style="display:flex;gap:12px;align-items:center">
           <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ CSV</button>
-          <button class="btn btn-ghost" id="llm-improve" onclick="showLLMImprove()" style="display:none" title="Create a custom reader for unusual statement formats">⬡ Custom Parser</button>
+          <button class="btn btn-ghost" id="llm-improve" onclick="showLLMImprove()" style="display:none" title="Get a custom parser from ChatGPT">⬡ Improve with ChatGPT</button>
           <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)" id="exec-time"></span>
         </div>
       </div>
@@ -188,17 +188,18 @@
 
       <!-- LLM parser (unsupported format) -->
       <div class="llm-parser-panel" id="llm-parser-panel" style="display:none">
-        <div class="llm-title" id="llm-panel-title">Unrecognized format</div>
+        <div class="llm-title" id="llm-panel-title">Unsupported statement format</div>
         <div class="llm-desc" id="llm-panel-desc">
-          The built-in reader didn't recognize <strong id="llm-file-name"></strong>.
-          Click below to create a custom reader in ChatGPT — then paste the result here.
+          The built-in parser found no transactions in <strong id="llm-file-name"></strong>.
+          Get a custom regex from ChatGPT: it opens with a sample of your statement;
+          paste the regex it returns below (with named groups <code>date, description, reference, debit, credit, balance</code>) and we'll run it offline — no code is ever executed.
         </div>
         <div class="llm-actions">
           <button class="btn btn-primary" onclick="openChatGPT()">⬡ Open ChatGPT</button>
         </div>
-        <textarea id="llm-parser-input" class="llm-input" placeholder="Paste the custom reader from ChatGPT here..." spellcheck="false"></textarea>
+        <textarea id="llm-parser-input" class="llm-input" placeholder="Paste the regex from ChatGPT, e.g. /(?<date>\d{2}-...\s+(?<description>.*?).../g" spellcheck="false"></textarea>
         <div class="llm-actions">
-          <button class="btn btn-primary" onclick="useLLMParser()">⚡ Use this reader</button>
+          <button class="btn btn-primary" onclick="useLLMParser()">⚡ Use this regex</button>
         </div>
         <div class="llm-status" id="llm-status" style="display:none"></div>
       </div>

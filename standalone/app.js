@@ -736,11 +736,11 @@ function updateLLMButton() {
   if (!btn) return;
   const n = allData.length;
   if (n === 0) {
-    btn.textContent = '⬡ Custom Parser';
-    btn.title = 'Built-in reader found no transactions. Create a custom reader.';
+    btn.textContent = '⬡ Get parser from ChatGPT';
+    btn.title = 'Built-in parser found no transactions. Get a custom parser from ChatGPT.';
   } else {
-    btn.textContent = '⬡ Custom Parser';
-    btn.title = 'Built-in reader found ' + n.toLocaleString() + ' rows. Create a more accurate reader.';
+    btn.textContent = '⬡ Improve with ChatGPT';
+    btn.title = 'Built-in parser found ' + n.toLocaleString() + ' rows. Get a more accurate parser from ChatGPT.';
   }
 }
 
