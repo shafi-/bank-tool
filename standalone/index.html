@@ -266,28 +266,32 @@
 <script type="module" src="app.js"></script>
 <script>
 // Service Worker Registration + update detection
+let swRegistration = null;
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
+      swRegistration = reg;
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
+        if (!newSW) return;
         newSW.addEventListener('statechange', () => {
           if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
             document.getElementById('update-banner').classList.add('show');
           }
         });
       });
-    });
+    }).catch(() => {});
   });
 }
 
 window.applyUpdate = function() {
-  navigator.serviceWorker.ready.then(reg => {
-    reg.waiting.postMessage('skip-waiting');
-  });
+  const reg = swRegistration;
+  if (!reg || !reg.waiting) return;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
-  });
+  }, { once: true });
+  reg.waiting.postMessage('skip-waiting');
 };
 
 // PWA Install Prompt
