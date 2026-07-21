@@ -143,8 +143,6 @@
         <button class="dt-chip" data-group="description" onclick="dtSetGroup('description')">Description</button>
         <button class="dt-chip" data-group="file" onclick="dtSetGroup('file')">File</button>
         <button class="dt-chip" data-group="date" onclick="dtSetGroup('date')">Month</button>
-        <button class="dt-chip" data-group="debit" onclick="dtSetGroup('debit')">Debit</button>
-        <button class="dt-chip" data-group="credit" onclick="dtSetGroup('credit')">Credit</button>
         <button class="dt-chip dt-clear" onclick="dtClearGroup()">Clear group</button>
         <span class="dt-sep"></span>
         <button class="dt-chip dt-clear" onclick="dtClearFilters()">Clear all filters</button>
@@ -157,7 +155,7 @@
         <div class="results-meta" id="results-meta"><span>RESULTS</span></div>
         <div style="display:flex;gap:12px;align-items:center">
           <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ CSV</button>
-          <button class="btn btn-ghost" id="llm-improve" onclick="showLLMImprove()" style="display:none" title="Get a custom parser from ChatGPT">⬡ Improve with ChatGPT</button>
+          <button class="btn btn-ghost" id="llm-improve" onclick="showLLMImprove()" style="display:none" title="Create a custom reader for unusual statement formats">⬡ Custom Parser</button>
           <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)" id="exec-time"></span>
         </div>
       </div>
@@ -167,6 +165,7 @@
           <div class="welcome-icon">🏦</div>
           <h1 class="welcome-title">Bank.Query</h1>
           <p class="welcome-desc">Browse your bank statements — fully offline, nothing leaves your browser.</p>
+          <div class="privacy-assurance">🔒 Everything stays on your device · We never see your data</div>
           <div class="welcome-steps">
             <div class="welcome-step">
               <span class="step-num">1</span>
@@ -189,18 +188,17 @@
 
       <!-- LLM parser (unsupported format) -->
       <div class="llm-parser-panel" id="llm-parser-panel" style="display:none">
-        <div class="llm-title" id="llm-panel-title">Unsupported statement format</div>
+        <div class="llm-title" id="llm-panel-title">Unrecognized format</div>
         <div class="llm-desc" id="llm-panel-desc">
-          The built-in parser found no transactions in <strong id="llm-file-name"></strong>.
-          Get a custom regex from ChatGPT: it opens with a sample of your statement;
-          paste the regex it returns below (with named groups <code>date, description, reference, debit, credit, balance</code>) and we'll run it offline — no code is ever executed.
+          The built-in reader didn't recognize <strong id="llm-file-name"></strong>.
+          Click below to create a custom reader in ChatGPT — then paste the result here.
         </div>
         <div class="llm-actions">
           <button class="btn btn-primary" onclick="openChatGPT()">⬡ Open ChatGPT</button>
         </div>
-        <textarea id="llm-parser-input" class="llm-input" placeholder="Paste the regex from ChatGPT, e.g. /(?<date>\d{2}-...\s+(?<description>.*?).../g" spellcheck="false"></textarea>
+        <textarea id="llm-parser-input" class="llm-input" placeholder="Paste the custom reader from ChatGPT here..." spellcheck="false"></textarea>
         <div class="llm-actions">
-          <button class="btn btn-primary" onclick="useLLMParser()">⚡ Use this regex</button>
+          <button class="btn btn-primary" onclick="useLLMParser()">⚡ Use this reader</button>
         </div>
         <div class="llm-status" id="llm-status" style="display:none"></div>
       </div>
