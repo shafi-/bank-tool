@@ -178,6 +178,7 @@ header {
 }
 .upload-zone .icon { font-size: 22px; display: block; margin-bottom: 6px; }
 #file-in { display: none; }
+.btn-parse { width: 100%; justify-content: center; margin-top: 10px; }
 
 /* Password field */
 .field-row { display: flex; gap: 6px; }
