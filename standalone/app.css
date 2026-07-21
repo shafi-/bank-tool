@@ -197,27 +197,15 @@ header {
 .pw-input:focus { border-color: var(--accent2); }
 .pw-input::placeholder { color: var(--ink3); }
 
-/* Password toggle */
-.password-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* Password message */
+.pw-message {
   font-size: 12px;
-  color: var(--ink2);
-  cursor: pointer;
-  user-select: none;
-  padding: 4px 0;
+  color: var(--amber);
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
-.password-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-.password-toggle:hover span {
-  color: var(--ink);
-}
-.pw-row {
-  margin-top: 8px;
+#pw-section .field-row {
+  margin-top: 4px;
 }
 
 /* Buttons */
