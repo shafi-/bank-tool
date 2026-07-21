@@ -595,12 +595,17 @@ async function parsePDF(file, password) {
   try {
     doc = await pdfjsLib.getDocument({
       data,
-      password,
+      password: password || '',
       useWorkerFetch: false,
       isEvalSupported: false,
     }).promise;
   } catch (e) {
-    if (e.name === 'PasswordException' || (e.message && e.message.toLowerCase().includes('password'))) {
+    if (e.name === 'PasswordException') {
+      if (e.code === 1) {
+        const err = new Error(`needs-password:${file.name}`);
+        err.needsPassword = true;
+        throw err;
+      }
       throw new Error(`Wrong password for "${file.name}"`);
     }
     throw e;
@@ -685,9 +690,14 @@ async function getRawLines(file, password) {
   const data = new Uint8Array(arrayBuffer);
   let doc;
   try {
-    doc = await pdfjsLib.getDocument({ data, password, useWorkerFetch: false, isEvalSupported: false }).promise;
+    doc = await pdfjsLib.getDocument({ data, password: password || '', useWorkerFetch: false, isEvalSupported: false }).promise;
   } catch (e) {
-    if (e.name === 'PasswordException' || (e.message && e.message.toLowerCase().includes('password'))) {
+    if (e.name === 'PasswordException') {
+      if (e.code === 1) {
+        const err = new Error(`needs-password:${file.name}`);
+        err.needsPassword = true;
+        throw err;
+      }
       throw new Error(`Wrong password for "${file.name}"`);
     }
     throw e;
@@ -926,6 +936,15 @@ function refreshAfterParse() {
 window.startParsing = async function() {
   if (!files.length) return;
   const password = document.getElementById('pw').value;
+  const pwSection = document.getElementById('pw-section');
+
+  // If password section is visible and password is empty, highlight it
+  if (pwSection.style.display !== 'none' && !password) {
+    document.getElementById('pw').focus();
+    document.getElementById('pw').style.borderColor = 'var(--red)';
+    return;
+  }
+  document.getElementById('pw').style.borderColor = '';
 
   // Show progress
   document.getElementById('progress-section').style.display = '';
@@ -945,17 +964,29 @@ window.startParsing = async function() {
   for (const file of files) {
     addLog(`⏳ ${file.name}…`);
     try {
-      const txns = await parsePDF(file, password);
+      const txns = await parsePDF(file, password || '');
       allData.push(...txns);
       addLog(`✓ ${file.name} → ${txns.length} transactions`);
       if (!txns.length) unsupported.push(file);
     } catch (e) {
+      if (e.needsPassword) {
+        addLog(`🔒 ${file.name} is password protected`);
+        pwSection.style.display = '';
+        document.getElementById('pw-message').textContent = `🔒 ${file.name} requires a password`;
+        document.getElementById('pw').focus();
+        document.getElementById('btn-parse').disabled = false;
+        document.getElementById('btn-parse').textContent = 'Retry with Password';
+        document.getElementById('progress-section').style.display = 'none';
+        return;
+      }
       addLog(`✗ ${file.name}: ${e.message}`);
       unsupported.push(file);
     }
     done++;
     bar.style.width = `${(done / files.length) * 100}%`;
   }
+  // Reset button text after successful parse
+  document.getElementById('btn-parse').textContent = 'Extract Data';
 
   addLog(`─ Done: ${allData.length} total transactions`);
 

@@ -47,14 +47,11 @@
       <button class="btn btn-primary btn-parse" id="btn-parse" onclick="startParsing()" disabled>Extract Data</button>
     </div>
 
-    <!-- Password -->
-    <div class="sidebar-block">
-      <div class="block-label">Password</div>
-      <label class="password-toggle">
-        <input type="checkbox" id="pw-protected" onchange="togglePasswordField()">
-        <span>My PDFs are password protected</span>
-      </label>
-      <div class="field-row pw-row" id="pw-row" style="display:none">
+    <!-- Password (auto-detected) -->
+    <div class="sidebar-block" id="pw-section" style="display:none">
+      <div class="block-label">Password Required</div>
+      <div class="pw-message" id="pw-message"></div>
+      <div class="field-row">
         <input type="password" id="pw" class="pw-input" placeholder="Enter PDF password">
       </div>
     </div>
