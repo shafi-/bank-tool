@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bankquery-v17';
+const CACHE_NAME = 'bankquery-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -17,7 +17,6 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS);
     })
   );
-  self.skipWaiting();
 });
 
 // Activate event - clean up old caches
@@ -34,6 +33,13 @@ self.addEventListener('activate', (event) => {
     })
   );
   self.clients.claim();
+});
+
+// Listen for skip-waiting message from the page
+self.addEventListener('message', (event) => {
+  if (event.data === 'skip-waiting') {
+    self.skipWaiting();
+  }
 });
 
 // Fetch event - serve from cache, fallback to network

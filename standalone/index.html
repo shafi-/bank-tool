@@ -27,6 +27,12 @@
   <button class="btn-hamburger" id="btn-hamburger" onclick="toggleSidebar()">☰</button>
 </header>
 
+<!-- Update banner -->
+<div class="update-banner" id="update-banner">
+  <span>A new version is available</span>
+  <button class="btn btn-update" onclick="applyUpdate()">Update</button>
+</div>
+
 <!-- Mobile sidebar overlay -->
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
@@ -259,14 +265,30 @@
 
 <script type="module" src="app.js"></script>
 <script>
-// Service Worker Registration for PWA
+// Service Worker Registration + update detection
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.log('SW registration failed:', err));
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            document.getElementById('update-banner').classList.add('show');
+          }
+        });
+      });
+    });
   });
 }
+
+window.applyUpdate = function() {
+  navigator.serviceWorker.ready.then(reg => {
+    reg.waiting.postMessage('skip-waiting');
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+};
 
 // PWA Install Prompt
 let deferredPrompt;
