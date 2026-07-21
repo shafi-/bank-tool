@@ -44,6 +44,7 @@
         <strong>multiple PDF files</strong>
       </div>
       <input type="file" id="file-in" accept=".pdf,.PDF" multiple>
+      <button class="btn btn-primary btn-parse" id="btn-parse" onclick="startParsing()" disabled>Extract Data</button>
     </div>
 
     <!-- Password -->
@@ -55,7 +56,6 @@
       </label>
       <div class="field-row pw-row" id="pw-row" style="display:none">
         <input type="password" id="pw" class="pw-input" placeholder="Enter PDF password">
-        <button class="btn btn-primary" id="btn-parse" onclick="startParsing()" disabled>Parse</button>
       </div>
     </div>
 
