@@ -902,7 +902,6 @@ window.useLLMParser = function() {
   };
   worker.postMessage({ source, flags, lines: llmSample.lines, file: llmSample.fileName, named });
 };
-};
 
 function refreshAfterParse() {
   const badge = document.getElementById('badge');
@@ -985,7 +984,6 @@ window.startParsing = async function() {
       improve.style.display = '';
       updateLLMButton();
     }
-  }
   }
 
   // Sort by date
