@@ -54,7 +54,7 @@ function renderSavedQueries() {
   queries.forEach(q => {
     const el = document.createElement('div');
     el.className = 'eq-item saved';
-    el.innerHTML = `<div class="eq-label">${escapeHtml(q.name)}</div>${escapeHtml(q.sql.split('\n')[0])}…<span class="eq-delete" onclick="event.stopPropagation(); deleteSavedQuery('${q.id}')">×</span>`;
+    el.innerHTML = `<div class="eq-label">${escapeHtml(q.name)}</div><span class="eq-delete" onclick="event.stopPropagation(); deleteSavedQuery('${q.id}')">×</span>`;
     el.onclick = () => { document.getElementById('sql').value = q.sql; };
     savedList.appendChild(el);
   });
@@ -161,7 +161,7 @@ const eqList = document.getElementById('eq-list');
 EXAMPLES.forEach(q => {
   const el = document.createElement('div');
   el.className = 'eq-item';
-  el.innerHTML = `<div class="eq-label">${q.label}</div>${q.sql.split('\n')[0]}…`;
+  el.innerHTML = `<div class="eq-label">${q.label}</div>`;
   el.onclick = () => { document.getElementById('sql').value = q.sql; };
   eqList.appendChild(el);
 });
@@ -1428,7 +1428,7 @@ function populateQueryPicker() {
     savedQueries.forEach(q => {
       const el = document.createElement('button');
       el.className = 'query-item saved';
-      el.innerHTML = `<span class="q-label">${escapeHtml(q.name)}</span><span class="q-preview">${escapeHtml(q.sql)}</span>`;
+      el.innerHTML = `<span class="q-label">${escapeHtml(q.name)}</span>`;
       el.onclick = () => {
         document.getElementById('sql').value = q.sql;
         hideQueryPicker();
@@ -1445,7 +1445,7 @@ function populateQueryPicker() {
     EXAMPLES.forEach(q => {
       const el = document.createElement('button');
       el.className = 'query-item';
-      el.innerHTML = `<span class="q-label">${q.label}</span><span class="q-preview">${q.sql.split('\n')[0]}…</span>`;
+      el.innerHTML = `<span class="q-label">${q.label}</span>`;
       el.onclick = () => {
         document.getElementById('sql').value = q.sql;
         hideQueryPicker();

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bank.Query - Offline SQL for Bank Statements</title>
-<meta name="description" content="Query your bank statements with SQL. Fully offline.">
+<title>BankStatements - Browse Bank Statements Offline</title>
+<meta name="description" content="Browse your bank statements. Fully offline.">
 <meta name="theme-color" content="#1a1714">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -79,7 +79,7 @@
 
     <!-- Schema -->
     <div class="sidebar-block">
-      <div class="block-label">Schema · transactions</div>
+      <div class="block-label">Fields · transactions</div>
       <div class="schema-row"><span class="fname">date</span><span class="ftype">TEXT</span></div>
       <div class="schema-row"><span class="fname">description</span><span class="ftype">TEXT</span></div>
       <div class="schema-row"><span class="fname">reference</span><span class="ftype">TEXT</span></div>
@@ -111,7 +111,7 @@
     <!-- Mode tabs -->
     <div class="mode-tabs">
       <button class="mode-tab active" data-mode="table" onclick="setTableView('table')">▤ Data Table</button>
-      <button class="mode-tab" data-mode="sql" onclick="setTableView('sql')">⌗ SQL Advanced</button>
+      <button class="mode-tab" data-mode="sql" onclick="setTableView('sql')">⌗ Custom Query</button>
     </div>
 
     <!-- SQL Editor (advanced mode) -->
@@ -169,7 +169,7 @@
         <div class="welcome-card" id="welcome-card">
           <div class="welcome-icon">🏦</div>
           <h1 class="welcome-title">Bank.Query</h1>
-          <p class="welcome-desc">Query your bank statements with SQL — fully offline, nothing leaves your browser.</p>
+          <p class="welcome-desc">Browse your bank statements — fully offline, nothing leaves your browser.</p>
           <div class="welcome-steps">
             <div class="welcome-step">
               <span class="step-num">1</span>
