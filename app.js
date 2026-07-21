@@ -147,9 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
 const EXAMPLES = [
   { label: "All transactions",    sql: "SELECT date, description, reference, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50" },
   { label: "Monthly spending",    sql: "SELECT SUBSTRING(date,1,7) AS month,\n  ROUND(SUM(debit),2) AS total_out,\n  ROUND(SUM(credit),2) AS total_in,\n  COUNT(*) AS count\nFROM transactions\nGROUP BY SUBSTRING(date,1,7)\nORDER BY month DESC" },
-  { label: "Biggest debits",      sql: "SELECT date, description, reference, debit, file\nFROM transactions\nWHERE debit IS NOT NULL\nORDER BY debit DESC\nLIMIT 20" },
+  { label: "Biggest payments",   sql: "SELECT date, description, reference, debit, file\nFROM transactions\nWHERE debit IS NOT NULL\nORDER BY debit DESC\nLIMIT 20" },
   { label: "Search merchant",     sql: "SELECT date, description, reference, debit, credit\nFROM transactions\nWHERE UPPER(description) LIKE '%AMAZON%'\nORDER BY date DESC" },
-  { label: "Credits only",        sql: "SELECT date, description, reference, credit\nFROM transactions\nWHERE credit IS NOT NULL AND credit > 0\nORDER BY credit DESC" },
+  { label: "Received only",     sql: "SELECT date, description, reference, credit\nFROM transactions\nWHERE credit IS NOT NULL AND credit > 0\nORDER BY credit DESC" },
   { label: "Per-file summary",    sql: "SELECT file,\n  COUNT(*) AS tx_count,\n  ROUND(SUM(debit),2) AS total_out,\n  ROUND(SUM(credit),2) AS total_in\nFROM transactions\nGROUP BY file\nORDER BY file" },
   { label: "Date range",          sql: "SELECT date, description, reference, debit, credit\nFROM transactions\nWHERE date >= '2024-01-01'\n  AND date <= '2024-03-31'\nORDER BY date" },
   { label: "Recurring amounts",   sql: "SELECT debit, COUNT(*) AS times,\n  MIN(description) AS sample\nFROM transactions\nWHERE debit IS NOT NULL\nGROUP BY debit\nHAVING COUNT(*) > 2\nORDER BY times DESC" },
@@ -1053,6 +1053,11 @@ window.startParsing = async function() {
   if (!sqlEl.value.trim()) {
     sqlEl.value = "SELECT date, description, reference, debit, credit, balance\nFROM transactions\nORDER BY date DESC\nLIMIT 50";
   }
+  // If a password was used, trigger Chrome's password manager to offer saving
+  if (password) {
+    const pwForm = document.getElementById('pw-form');
+    if (pwForm && pwForm.requestSubmit) pwForm.requestSubmit();
+  }
   setTableView('table');
 };
 
@@ -1100,8 +1105,8 @@ const DT_COLUMNS = [
   { key: 'date',        label: 'Date',        type: 'date' },
   { key: 'description', label: 'Description', type: 'text' },
   { key: 'reference',   label: 'Reference',   type: 'text' },
-  { key: 'debit',       label: 'Debit',       type: 'number' },
-  { key: 'credit',      label: 'Credit',      type: 'number' },
+  { key: 'debit',       label: 'Sent/Spent',  type: 'number' },
+  { key: 'credit',      label: 'Received',    type: 'number' },
   { key: 'balance',     label: 'Balance',     type: 'number' },
   { key: 'file',        label: 'File',        type: 'category' },
 ];
@@ -1204,7 +1209,7 @@ function dtFilterControls() {
       <div class="dt-th-label" onclick="dtSortClick('${c.key}')">${c.label}<span class="si">${dtSortCol===c.key?(dtSortDir>0?'↑':'↓'):'⇅'}</span></div>
       <select class="dt-op" onchange="dtOpChange('${c.key}',this.value)">${ops}</select>
       <input class="dt-val" type="text" placeholder="value" value="${f.value??''}" oninput="dtValChange('${c.key}','value',this.value)">
-      ${(c.type==='number'||c.type==='date') ? `<input class="dt-val2" type="text" placeholder="to" value="${f.value2??''}" oninput="dtValChange('${c.key}','value2',this.value)">` : ''}
+      ${f.op==='between' ? `<input class="dt-val2" type="text" placeholder="to" value="${f.value2??''}" oninput="dtValChange('${c.key}','value2',this.value)">` : ''}
     </th>`;
   }).join('');
 }
@@ -1265,13 +1270,10 @@ function dtRender() {
   document.getElementById('btn-export').disabled = total === 0;
   lastRows = rows;
 
-  if (!total) {
-    wrap.innerHTML = '<div class="empty-state"><div class="big">∅</div><div class="title">No rows match filters</div></div>';
-    return;
-  }
-
   let html = '<table class="dt-table"><thead><tr>' + dtFilterControls() + '</tr></thead><tbody>';
-  if (dtGroupBy) {
+  if (!total) {
+    html += `<tr><td colspan="${DT_COLUMNS.length}" class="dt-empty">No rows match filters</td></tr>`;
+  } else if (dtGroupBy) {
     for (const g of groups) {
       const sumD = g.rows.reduce((s,r)=>s+(r.debit||0),0);
       const sumC = g.rows.reduce((s,r)=>s+(r.credit||0),0);
@@ -1283,6 +1285,37 @@ function dtRender() {
   }
   html += '</tbody></table>';
   wrap.innerHTML = html;
+  dtSyncSQL();
+}
+
+function dtSyncSQL() {
+  const clauses = [];
+  for (const key in dtFilters) {
+    const f = dtFilters[key];
+    if (!f || !f.op) continue;
+    if (f.op === 'empty') {
+      clauses.push(key + ' IS NULL');
+      continue;
+    }
+    if (!f.value && f.value !== 0) continue;
+    const v = String(f.value);
+    const v2 = f.value2 != null ? String(f.value2) : null;
+    const esc = s => "'" + s.replace(/'/g, "''") + "'";
+    switch (f.op) {
+      case 'contains': clauses.push('UPPER(' + key + ') LIKE ' + esc('%' + v.toUpperCase() + '%')); break;
+      case 'starts':   clauses.push('UPPER(' + key + ') LIKE ' + esc(v.toUpperCase() + '%')); break;
+      case 'eq':       clauses.push(key + ' = ' + (isNaN(Number(v)) ? esc(v) : v)); break;
+      case 'neq':      clauses.push(key + ' != ' + (isNaN(Number(v)) ? esc(v) : v)); break;
+      case 'gte':      clauses.push(key + ' >= ' + v); break;
+      case 'lte':      clauses.push(key + ' <= ' + v); break;
+      case 'between':  clauses.push(key + ' >= ' + v + ' AND ' + key + ' <= ' + (v2 || v)); break;
+    }
+  }
+  let sql = 'SELECT date, description, reference, debit, credit, balance, file\nFROM transactions';
+  if (clauses.length) sql += '\nWHERE ' + clauses.join('\n  AND ');
+  if (dtSortCol) sql += '\nORDER BY ' + dtSortCol + ' ' + (dtSortDir > 0 ? 'ASC' : 'DESC');
+  if (dtGroupBy) sql += '\nGROUP BY ' + dtGroupBy;
+  document.getElementById('sql').value = sql;
 }
 
 // Mode switching
@@ -1292,7 +1325,7 @@ window.setTableView = function(mode) {
   document.getElementById('pane-table').style.display  = (mode === 'table') ? '' : 'none';
   document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   if (mode === 'table') dtRender();
-  else { /* SQL pane: re-run current query */ }
+  else dtSyncSQL();
 };
 
 // Export reflects current view
