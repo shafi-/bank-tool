@@ -57,9 +57,12 @@
     <div class="sidebar-block" id="pw-section" style="display:none">
       <div class="block-label">Password Required</div>
       <div class="pw-message" id="pw-message"></div>
-      <div class="field-row">
-        <input type="password" id="pw" class="pw-input" placeholder="Enter PDF password">
-      </div>
+      <form id="pw-form" action="#">
+        <input type="text" autocomplete="username" value="bank-query-user" style="display:none" readonly>
+        <div class="field-row">
+          <input type="password" id="pw" class="pw-input" placeholder="Enter PDF password" autocomplete="new-password">
+        </div>
+      </form>
     </div>
 
     <!-- Progress -->
@@ -75,8 +78,8 @@
       <div class="stat-grid">
         <div class="stat-card"><div class="s-label">Transactions</div><div class="s-val c-blue" id="s-count">—</div></div>
         <div class="stat-card"><div class="s-label">Files</div><div class="s-val c-blue" id="s-files">—</div></div>
-        <div class="stat-card"><div class="s-label">Total Debit</div><div class="s-val c-red" id="s-debit">—</div></div>
-        <div class="stat-card"><div class="s-label">Total Credit</div><div class="s-val c-green" id="s-credit">—</div></div>
+        <div class="stat-card"><div class="s-label">Total Sent/Spent</div><div class="s-val c-red" id="s-debit">—</div></div>
+        <div class="stat-card"><div class="s-label">Total Received</div><div class="s-val c-green" id="s-credit">—</div></div>
       </div>
     </div>
 
@@ -293,6 +296,9 @@ window.applyUpdate = function() {
   }, { once: true });
   reg.waiting.postMessage('skip-waiting');
 };
+
+// Prevent form submission from navigating away
+document.getElementById('pw-form').addEventListener('submit', e => e.preventDefault());
 
 // PWA Install Prompt
 let deferredPrompt;
