@@ -959,8 +959,17 @@ tr:hover td { background: var(--paper); }
   font-size: 15px;
   line-height: 1.7;
   color: var(--ink2);
-  margin-bottom: 32px;
+  margin-bottom: 8px;
   max-width: 380px;
+}
+.privacy-assurance {
+  font-size: 12px;
+  color: var(--green);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 .welcome-steps {
   display: flex;
