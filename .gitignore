@@ -1,1 +1,21 @@
+# OS / editor cruft
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.log
+
+# Local environment / secrets (none expected, kept for safety)
+.env
+.env.*
+
+# IDE / editor
+.idea/
+.vscode/
+*.sublime-workspace
+
+# CNAME was a corrupted/leaked file; keep it out of the repo entirely
+CNAME
+
+# The standalone/ folder intentionally vendors its dependencies
+# (alasql.min.js, pdf.min.mjs, pdf.worker.min.mjs) — do not ignore them.
