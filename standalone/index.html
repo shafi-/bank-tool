@@ -164,6 +164,7 @@
         <div class="results-meta" id="results-meta"><span>RESULTS</span></div>
         <div style="display:flex;gap:12px;align-items:center">
           <button class="btn btn-export" id="btn-export" onclick="exportCSV()" disabled>⬇ CSV</button>
+          <button class="btn btn-ghost" id="btn-tmpl" onclick="openTemplateBuilder()" style="display:none" title="Define a custom parser from your statement layout">📐 Build template</button>
           <button class="btn btn-ghost" id="llm-improve" onclick="showLLMImprove()" style="display:none" title="Get a custom parser from ChatGPT">⬡ Improve with ChatGPT</button>
           <span style="font-family:var(--mono);font-size:11px;color:var(--ink3)" id="exec-time"></span>
         </div>
@@ -208,12 +209,48 @@
         </div>
         <textarea id="llm-parser-input" class="llm-input" placeholder="Paste the regex from ChatGPT, e.g. /(?<date>\d{2}-...\s+(?<description>.*?).../g" spellcheck="false"></textarea>
         <div class="llm-actions">
+          <button class="btn btn-ghost" onclick="openTemplateBuilder()">📐 Or build a template</button>
           <button class="btn btn-primary" onclick="useLLMParser()">⚡ Use this regex</button>
         </div>
         <div class="llm-status" id="llm-status" style="display:none"></div>
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Template parser builder -->
+<div class="expand-modal" id="template-builder-modal">
+  <div class="expand-modal-inner template-inner">
+    <div class="expand-modal-header">
+      <span class="expand-modal-title">📐 Build a custom parser</span>
+      <div class="expand-modal-actions">
+        <button class="btn btn-ghost" onclick="closeTemplateBuilder()">Cancel</button>
+      </div>
+    </div>
+    <div class="template-body">
+      <p class="template-desc">Click a transaction line from your statement below, then replace the values with placeholders. We compile it into a regex and run it offline — nothing leaves your browser.</p>
+      <div class="template-row">
+        <label class="template-label">Page</label>
+        <select id="tmpl-page" onchange="tmplSelectPage()"></select>
+      </div>
+      <div class="tmpl-raw" id="tmpl-raw"></div>
+      <div class="template-tokens">
+        <span class="template-label">Insert:</span>
+        <button class="tmpl-tok" type="button" onclick="tmplInsertToken('date')">{date}</button>
+        <button class="tmpl-tok" type="button" onclick="tmplInsertToken('description')">{description}</button>
+        <button class="tmpl-tok" type="button" onclick="tmplInsertToken('reference')">{reference}</button>
+        <button class="tmpl-tok" type="button" onclick="tmplInsertToken('debit')">{debit}</button>
+        <button class="tmpl-tok" type="button" onclick="tmplInsertToken('credit')">{credit}</button>
+        <button class="tmpl-tok" type="button" onclick="tmplInsertToken('balance')">{balance}</button>
+      </div>
+      <textarea id="tmpl-input" class="tmpl-input" placeholder="e.g. {date}  {description}  {reference}  {debit}  {credit}  {balance}" spellcheck="false"></textarea>
+      <div class="template-actions">
+        <button class="btn btn-ghost" type="button" onclick="tmplPreview()">👁 Preview</button>
+        <button class="btn btn-primary" type="button" onclick="tmplUseParser()">⚡ Use this parser</button>
+      </div>
+      <pre class="tmpl-preview" id="tmpl-preview"></pre>
+    </div>
   </div>
 </div>
 

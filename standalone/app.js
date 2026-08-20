@@ -5,6 +5,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
 // ─── State ──────────────────────────────────────────────────────────────────
 let files     = [];   // FileList/array
 let allData   = [];   // parsed transactions
+let rawPageLines = []; // raw text lines per page, used by the template parser
 let lastRows  = [];   // last query results
 let sortCol   = null;
 let sortDir   = 1;
@@ -631,6 +632,13 @@ async function parsePDF(file, password) {
 
     // Group items into lines
     const lines = groupItemsByLine(items);
+
+    // Capture raw lines for the template parser (shown to the user later)
+    rawPageLines.push({
+      file: file.name,
+      page: p,
+      lines: lines.map(l => (l.text || '').trim()).filter(Boolean)
+    });
     if (DEBUG && p === 1) {
       console.log(`  Page ${p}: ${lines.length} lines grouped`);
       logSampleLines(lines, 8);
@@ -913,6 +921,158 @@ window.useLLMParser = function() {
   worker.postMessage({ source, flags, lines: llmSample.lines, file: llmSample.fileName, named });
 };
 
+// ─── Template parser (build a regex from a marked-up line) ───────────────────
+// Instead of hand-writing a regex or prompting ChatGPT, the user picks a real
+// transaction line, replaces the values with placeholders ({date}, {description},
+// …), and we compile it into the same named-group regex useLLMParser expects.
+const TMPL_TOKENS = {
+  date:        '(?<date>[0-9]{1,4}[-/.][0-9A-Za-z]{1,5}[-/.][0-9]{1,4})',
+  // Description is greedy so it captures the whole narrative; reference is lazy
+  // so the amount block at the end still binds correctly. Dates/amounts use
+  // specific patterns, which anchor the match.
+  // Description is a tempered-greedy capture: it grabs the narrative but stops
+  // at the first number that is itself followed by another number (the amount
+  // block). That keeps it from eating the debit/credit/balance columns, and
+  // naturally leaves a trailing code (e.g. a reference number) for {reference}.
+  description: '(?<description>(?:(?!\\d[\\d,.]*\\s+\\d)[\\s\\S])*)',
+  reference:   '(?<reference>.+?)',
+  debit:       '(?<debit>-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)',
+  credit:      '(?<credit>-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)',
+  balance:     '(?<balance>-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)',
+};
+
+const TMPL_AMOUNTS = new Set(['debit', 'credit', 'balance']);
+
+// Escape a literal segment, turning its whitespace into the right separator:
+// generous (\s*) before an amount column (blank columns are common), tighter
+// (\s+) between text columns.
+function escapeLiteral(lit, nextTok) {
+  const esc = lit.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const sep = nextTok && TMPL_AMOUNTS.has(nextTok) ? '\\s*' : '\\s+';
+  return esc.replace(/\s+/g, sep);
+}
+
+// Turn a template like "{date}  {description}  {reference}  {debit}  {credit}  {balance}"
+// into a RegExp source the worker (useLLMParser) can run.
+function buildRegexFromTemplate(tmpl) {
+  const tokenRe = /\{([a-z]+)\}/g;
+  let m, last = 0;
+  const parts = [];
+  const seen = {};
+  while ((m = tokenRe.exec(tmpl)) !== null) {
+    const name = m[1];
+    if (!TMPL_TOKENS[name]) {
+      return { error: `Unknown placeholder "{${name}}". Use: ${Object.keys(TMPL_TOKENS).join(', ')}` };
+    }
+    if (seen[name]) {
+      return { error: `Placeholder "{${name}}" is used more than once. Use each placeholder at most once.` };
+    }
+    seen[name] = true;
+    const lit = tmpl.slice(last, m.index);
+    if (lit) parts.push(escapeLiteral(lit, name));
+    parts.push(TMPL_TOKENS[name]);
+    last = tokenRe.lastIndex;
+  }
+  const tail = tmpl.slice(last);
+  if (tail) parts.push(escapeLiteral(tail).replace(/\s+/g, '\\s*'));
+  if (!seen.date) return { error: 'Include a {date} placeholder — it is required.' };
+  if (parts.length === 0) return { error: 'Template is empty.' };
+  return { pattern: '^\\s*' + parts.join('') + '\\s*$' };
+}
+
+window.openTemplateBuilder = function() {
+  const modal = document.getElementById('template-builder-modal');
+  if (!modal) return;
+  if (rawPageLines.length) {
+    llmSample = { fileName: rawPageLines[0].file, lines: rawPageLines.flatMap(p => p.lines) };
+  }
+  const sel = document.getElementById('tmpl-page');
+  sel.innerHTML = '';
+  if (!rawPageLines.length) {
+    sel.innerHTML = '<option>No statement loaded yet</option>';
+  } else {
+    rawPageLines.forEach((p, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      o.textContent = `${p.file} — page ${p.page}`;
+      sel.appendChild(o);
+    });
+  }
+  tmplRenderPage();
+  document.getElementById('tmpl-input').value = '';
+  document.getElementById('tmpl-preview').textContent = '';
+  modal.style.display = 'flex';
+};
+
+window.closeTemplateBuilder = function() {
+  const modal = document.getElementById('template-builder-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+function tmplRenderPage() {
+  const sel = document.getElementById('tmpl-page');
+  const idx = parseInt(sel.value, 10) || 0;
+  const page = rawPageLines[idx];
+  const wrap = document.getElementById('tmpl-raw');
+  wrap.innerHTML = '';
+  if (!page) return;
+  page.lines.forEach(line => {
+    const d = document.createElement('div');
+    d.className = 'tmpl-line';
+    d.textContent = line;
+    d.onclick = () => {
+      document.getElementById('tmpl-input').value = line;
+      document.getElementById('tmpl-preview').textContent = '';
+    };
+    wrap.appendChild(d);
+  });
+}
+
+window.tmplSelectPage = function() { tmplRenderPage(); };
+
+window.tmplInsertToken = function(tok) {
+  const ta = document.getElementById('tmpl-input');
+  const s = ta.selectionStart || ta.value.length;
+  const e = ta.selectionEnd || ta.value.length;
+  ta.value = ta.value.slice(0, s) + '{' + tok + '}' + ta.value.slice(e);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = s + tok.length + 2;
+};
+
+window.tmplPreview = function() {
+  const out = document.getElementById('tmpl-preview');
+  const tmpl = document.getElementById('tmpl-input').value;
+  const { pattern, error } = buildRegexFromTemplate(tmpl);
+  if (error) { out.textContent = '✗ ' + error; return; }
+  const sel = document.getElementById('tmpl-page');
+  const page = rawPageLines[parseInt(sel.value, 10) || 0];
+  let re;
+  try { re = new RegExp(pattern, 'g'); } catch (e) { out.textContent = '✗ Invalid regex: ' + e.message; return; }
+  let count = 0, sample = null;
+  for (const line of (page ? page.lines : [])) {
+    re.lastIndex = 0;
+    const m = re.exec(line);
+    if (m) { count++; if (!sample) sample = m.groups; }
+  }
+  let msg = `✓ ${count} line(s) on this page match.\n`;
+  msg += sample ? 'Sample: ' + JSON.stringify(sample) : 'No matches here — adjust the template or pick another page.';
+  out.textContent = msg;
+};
+
+window.tmplUseParser = function() {
+  const out = document.getElementById('tmpl-preview');
+  const tmpl = document.getElementById('tmpl-input').value;
+  const { pattern, error } = buildRegexFromTemplate(tmpl);
+  if (error) { out.textContent = '✗ ' + error; return; }
+  if (rawPageLines.length) {
+    llmSample = { fileName: rawPageLines[0].file, lines: rawPageLines.flatMap(p => p.lines) };
+  }
+  allData = [];
+  document.getElementById('llm-parser-input').value = pattern;
+  closeTemplateBuilder();
+  useLLMParser();
+};
+
 function refreshAfterParse() {
   const badge = document.getElementById('badge');
   badge.className = 'badge ok';
@@ -958,6 +1118,7 @@ window.startParsing = async function() {
   }
 
   allData = [];
+  rawPageLines = [];
   let done = 0;
   const unsupported = [];
 
@@ -1047,6 +1208,10 @@ window.startParsing = async function() {
   document.getElementById('btn-parse').disabled   = false;
   document.getElementById('btn-save').disabled    = false;
   document.getElementById('btn-save-mobile').disabled = false;
+
+  // Reveal the "Build template" entry point now that raw lines exist
+  const tmplBtn = document.getElementById('btn-tmpl');
+  if (tmplBtn) tmplBtn.style.display = '';
 
   // Default into the no-SQL data-table view; keep SQL prefilled for advanced mode
   const sqlEl = document.getElementById('sql');

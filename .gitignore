@@ -19,3 +19,6 @@ CNAME
 
 # The standalone/ folder intentionally vendors its dependencies
 # (alasql.min.js, pdf.min.mjs, pdf.worker.min.mjs) — do not ignore them.
+
+# Local scratch / test scripts
+.temp/
