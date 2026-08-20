@@ -6,6 +6,53 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
 let files     = [];   // FileList/array
 let allData   = [];   // parsed transactions
 let rawPageLines = []; // raw text lines per page, used by the template parser
+let detectedHeaders = null; // best-effort header detection for unrecognized PDFs
+
+// Lenient header detection: find a row whose tokens look like column headers,
+// even when the strict detectColumns() rule (date AND amount on one line) fails
+// — e.g. headers split across lines, or synonyms like "posting date" /
+// "withdrawals" / "closing balance". Returns ordered standard column names.
+function detectHeaderSoft(lines) {
+  const VOCAB = [
+    { name: 'date',    re: /\b(trn\.?\s*date|transaction\s*date|posting\s*date|value\s*date|date)\b/i },
+    { name: 'desc',    re: /\b(descr|description|narrat|detail|remark|particular|memo)/i },
+    { name: 'ref',     re: /\b(ref|reference|cheque|check|chq|utr|trace|folio|voucher)\b/i },
+    { name: 'debit',   re: /\b(debit|withdraw|paid\s*out|amount\s*out|\bdr\b)/i },
+    { name: 'credit',  re: /\b(credit|deposit|paid\s*in|amount\s*in|received|\bcr\b)/i },
+    { name: 'balance', re: /\b(balance|running|closing|clear\s*balance|\bbal\b)/i },
+  ];
+  const DATEISH = /\d{1,2}[/\-\s]\d{1,2}|\d{1,2}[\-\s](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+  for (const line of lines) {
+    const hits = [];
+    for (const part of line.parts) {
+      const s = (part.str || '').trim();
+      if (!s) continue;
+      for (const v of VOCAB) {
+        if (v.re.test(s)) { hits.push({ name: v.name, x: part.x }); break; }
+      }
+    }
+    const distinct = [...new Set(hits.map(h => h.name))];
+    const hasAnchor = distinct.some(n => n === 'date' || n === 'debit' || n === 'credit' || n === 'balance');
+    if (distinct.length >= 2 && hasAnchor) {
+      hits.sort((a, b) => a.x - b.x);
+      const columns = []; const seen = new Set();
+      for (const h of hits) { if (!seen.has(h.name)) { seen.add(h.name); columns.push(h.name); } }
+      let sample = null;
+      for (const l of lines) {
+        if (l === line) continue;
+        if (DATEISH.test(l.text) && l.text.trim().length > 10) { sample = l.text.trim(); break; }
+      }
+      return { columns, sampleLine: sample, y: line.y };
+    }
+  }
+  return null;
+}
+
+// Map detected header names to template placeholder tokens.
+const HEADER_TO_TOK = {
+  date: 'date', desc: 'description', ref: 'reference',
+  debit: 'debit', credit: 'credit', balance: 'balance',
+};
 let lastRows  = [];   // last query results
 let sortCol   = null;
 let sortDir   = 1;
@@ -649,6 +696,12 @@ async function parsePDF(file, password) {
       colInfo = detectColumns(lines);
       if (!colInfo) {
         if (DEBUG) console.log(`  ⚠ No columns detected, will use fallback`);
+        const soft = detectHeaderSoft(lines);
+        if (soft) {
+          detectedHeaders = soft;
+          detectedHeaders.pageIndex = p - 1;
+          if (DEBUG) console.log('  Soft header detection:', soft.columns.join(', '));
+        }
       }
     }
 
@@ -936,19 +989,22 @@ const TMPL_TOKENS = {
   // naturally leaves a trailing code (e.g. a reference number) for {reference}.
   description: '(?<description>(?:(?!\\d[\\d,.]*\\s+\\d)[\\s\\S])*)',
   reference:   '(?<reference>.+?)',
-  debit:       '(?<debit>-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)',
-  credit:      '(?<credit>-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)',
-  balance:     '(?<balance>-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?)',
+  // Amount columns are tolerant: each matches EITHER "whitespace + a number"
+  // OR "whitespace only" (a blank cell). This keeps positional alignment even
+  // when a statement leaves a column empty (e.g. a blank debit), so a row is
+  // never dropped and numbers are never mis-assigned to the wrong column.
+  debit:       '(?<debit>(?:\\s+-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?|\\s+))',
+  credit:      '(?<credit>(?:\\s+-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?|\\s+))',
+  balance:     '(?<balance>(?:\\s+-?[0-9][0-9,]*(?:\\.[0-9]{1,2})?|\\s+))',
 };
 
 const TMPL_AMOUNTS = new Set(['debit', 'credit', 'balance']);
 
-// Escape a literal segment, turning its whitespace into the right separator:
-// generous (\s*) before an amount column (blank columns are common), tighter
-// (\s+) between text columns.
+// Escape a literal segment. Between text columns use \s+; an amount token
+// already carries its own leading \s+, so emit no extra separator there.
 function escapeLiteral(lit, nextTok) {
   const esc = lit.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const sep = nextTok && TMPL_AMOUNTS.has(nextTok) ? '\\s*' : '\\s+';
+  const sep = nextTok && TMPL_AMOUNTS.has(nextTok) ? '' : '\\s+';
   return esc.replace(/\s+/g, sep);
 }
 
@@ -999,7 +1055,28 @@ window.openTemplateBuilder = function() {
     });
   }
   tmplRenderPage();
-  document.getElementById('tmpl-input').value = '';
+  // Best-effort starting template from lenient header detection: prefill the
+  // placeholders in detected column order so the user only adjusts spacing
+  // (and drops any column their statement doesn't have) before Previewing.
+  const hint = document.getElementById('tmpl-detected');
+  if (detectedHeaders && detectedHeaders.columns.length) {
+    const toks = detectedHeaders.columns.map(c => '{' + HEADER_TO_TOK[c] + '}');
+    document.getElementById('tmpl-input').value = toks.join('  ');
+    if (hint) {
+      hint.textContent = 'We auto-detected these columns (in order): ' +
+        detectedHeaders.columns.map(c => HEADER_TO_TOK[c]).join(', ') +
+        '. Tweak the spacing to match a real line, remove columns that are blank, then Preview.';
+      hint.style.display = '';
+    }
+    if (typeof detectedHeaders.pageIndex === 'number') {
+      const sel = document.getElementById('tmpl-page');
+      if (sel && sel.options[detectedHeaders.pageIndex]) sel.selectedIndex = detectedHeaders.pageIndex;
+      tmplRenderPage();
+    }
+  } else {
+    document.getElementById('tmpl-input').value = '';
+    if (hint) hint.style.display = 'none';
+  }
   document.getElementById('tmpl-preview').textContent = '';
   modal.style.display = 'flex';
 };
@@ -1119,6 +1196,7 @@ window.startParsing = async function() {
 
   allData = [];
   rawPageLines = [];
+  detectedHeaders = null;
   let done = 0;
   const unsupported = [];
 
@@ -1212,6 +1290,16 @@ window.startParsing = async function() {
   // Reveal the "Build template" entry point now that raw lines exist
   const tmplBtn = document.getElementById('btn-tmpl');
   if (tmplBtn) tmplBtn.style.display = '';
+
+  // Unrecognized PDF (no rows from the built-in parser): if we auto-detected a
+  // header row, open the template builder pre-filled so the user can confirm
+  // and complete the best-effort template instead of starting from scratch.
+  if (allData.length === 0 && detectedHeaders && detectedHeaders.columns.length) {
+    openTemplateBuilder();
+  } else if (allData.length > 0) {
+    // Built-in parser succeeded — don't offer a stale pre-filled template.
+    detectedHeaders = null;
+  }
 
   // Default into the no-SQL data-table view; keep SQL prefilled for advanced mode
   const sqlEl = document.getElementById('sql');
