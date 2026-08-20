@@ -222,6 +222,33 @@ APIs (all current desktop/mobile browsers qualify).
 
 ---
 
+## 📋 Supported formats & limitations
+
+Bank.Query is built to be **privacy-first, not format-universal**. The parser is
+layout-aware (it reads column positions and headers from the PDF text layer), so
+results depend on how a given bank lays out its statements.
+
+**Works best with:**
+- Tabular statements that have clear `date`, `description`, `debit`, `credit`,
+  and `balance` columns.
+- Password-protected PDFs (most common encryption schemes).
+- Multi-page and multi-file loads (a `file` column tags each row).
+
+**Known limitations:**
+- **PDF only** — no CSV / OFX / QIF import yet.
+- **Layout-sensitive** — unusual or heavily graphical statements may need
+  manual review; some columns may parse as `NULL`.
+- **Date formats** — common formats are normalized; exotic ones may be kept
+  as-is in `date`.
+- **Large files** — parsing is in-browser; very large statements can be slow
+  on low-end devices.
+- **One external request** — the webfont (Google Fonts) is fetched on first
+  load only; no statement data ever leaves the browser. See
+  [Privacy & security](#-privacy--security).
+
+If your bank's format doesn't parse well, please open an issue with a
+(redacted) sample so the parser can be improved.
+
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: edit under `standalone/`,
