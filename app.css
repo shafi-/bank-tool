@@ -506,6 +506,7 @@ header {
 .template-inner { max-width: 760px; height: auto; max-height: 88vh; }
 .template-body { flex: 1; padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .template-desc { margin: 0; font-size: 13px; color: var(--ink3); line-height: 1.5; }
+.tmpl-detected { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--accent2); border-radius: var(--r); background: color-mix(in srgb, var(--accent2) 12%, var(--bg)); color: var(--ink1); font-size: 12.5px; line-height: 1.5; }
 .template-row { display: flex; align-items: center; gap: 10px; }
 .template-label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); }
 .template-row select { background: var(--bg); color: var(--accent); border: 1px solid var(--rule2); border-radius: var(--r); padding: 6px 8px; font-size: 13px; min-width: 240px; }
